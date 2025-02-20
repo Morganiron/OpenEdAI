@@ -61,3 +61,10 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+###############################################################################
+
+# AI Models and Data Files
+*.onnx      binary
+*.jsonl     binary
+*.pt        binary
+*.pkl       binary

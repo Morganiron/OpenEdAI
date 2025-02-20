@@ -90,13 +90,19 @@ StyleCopReport.xml
 *.tmp
 *.tmp_proj
 *_wpftmp.csproj
-*.log
 *.vspscc
 *.vssscc
 .builds
 *.pidb
 *.svclog
 *.scc
+
+# Log & Cache Files
+logs/
+*.log
+*.tlog
+*.cache
+*.json.bak
 
 # Chutzpah Test files
 _Chutzpah*
@@ -361,3 +367,24 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# MySQL temp files
+*.sql
+*.sqlite
+*.bak
+
+# .env security exclusions
+.env
+.env.local
+.env.development
+.env.production
+
+# Blazor WebAssembly auto-generated files
+wwwroot/css/bootstrap.min.css
+wwwroot/css/open-iconic-bootstrap.min.css
+wwwroot/css/site.css
+
+# Docker-related files
+.dockerignore
+Dockerfile
+docker-compose.yml
