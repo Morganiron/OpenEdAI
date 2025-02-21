@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using OpenEdAI.Data;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +27,28 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     )
 );
 
+// Configure JWT Authentication
+var awsSettings = builder.Configuration.GetSection("AWS");
+var cognitoAuthority = $"https://cognito-idp.{awsSettings["Region"]}.amazonaws.com/{awsSettings["UserPoolId"]}";
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = cognitoAuthority;
+        options.Audience = awsSettings["AppClientId"];
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = cognitoAuthority,
+            ValidateAudience = true,
+            ValidAudience = awsSettings["AppClientId"],
+            ValidateLifetime = true
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -36,6 +60,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Enable authentication & authorization middleware
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
