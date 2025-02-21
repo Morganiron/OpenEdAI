@@ -7,7 +7,7 @@ namespace OpenEdAI.Models
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int ProgessID { get; private set; }
+        public int ProgressID { get; private set; }
 
         [ForeignKey("User")]
         public string Owner { get; private set; } // AWS Cognito UserID
