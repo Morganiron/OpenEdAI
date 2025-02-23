@@ -32,7 +32,10 @@ namespace OpenEdAI.Models
         public DateTime UpdateDate { get; private set; } = DateTime.UtcNow;
 
         
-        // Constructor
+        // Constructors
+
+        private Lesson() { } // EF Core required
+
         public Lesson(string title, string description, string contentLink, int courseID, string owner, string userName)
         {
             Title = title;
