@@ -5,9 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.Data;
 using OpenEdAI.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Linq;
 
 namespace OpenEdAI.Controllers
 {
@@ -18,11 +15,15 @@ namespace OpenEdAI.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IAmazonCognitoIdentityProvider _cognitoProvider;
+        private readonly string _userPoolId;
 
-        public UsersController(ApplicationDbContext context, IAmazonCognitoIdentityProvider cognitoProvider)
+        public UsersController(ApplicationDbContext context,
+            IAmazonCognitoIdentityProvider cognitoProvider,
+            IConfiguration configuration)
         {
             _context = context;
             _cognitoProvider = cognitoProvider;
+            _userPoolId = configuration["AWS:UserPoolId"];
         }
 
         // GET: api/Users
@@ -37,11 +38,27 @@ namespace OpenEdAI.Controllers
         public async Task<ActionResult<User>> GetUser(string id)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
                 return NotFound();
 
-            return user;
+            // Fetch Cognito attributes
+            var request = new AdminGetUserRequest
+            {
+                UserPoolId = _userPoolId,
+                Username = id
+            };
+            var response = await _cognitoProvider.AdminGetUserAsync(request);
+
+            // Extract preferred_username
+            var displayName = response.UserAttributes.FirstOrDefault(attr => attr.Name == "preferred_username")?.Value;
+
+            return Ok(new
+            {
+                user.UserID,
+                DisplayName = displayName,
+                user.Email,
+                user.Role
+            });
         }
 
         // PATCH: api/Users/{id}/update-name
@@ -49,30 +66,23 @@ namespace OpenEdAI.Controllers
         public async Task<IActionResult> UpdateUserName(string id, [FromBody] string newName)
         {
             var user = await _context.Users.FindAsync(id);
-
             if (user == null)
                 return NotFound();
 
             // Update Cognito preferred_username
             var request = new AdminUpdateUserAttributesRequest
             {
-                UserPoolId = "", // Cognito User Pool ID
+                UserPoolId = _userPoolId,
                 Username = id,
                 UserAttributes = new List<AttributeType>
-                {
-                    new AttributeType { Name = "preferred_username", Value = newName }
-                }
+        {
+            new AttributeType { Name = "preferred_username", Value = newName }
+        }
             };
 
             await _cognitoProvider.AdminUpdateUserAttributesAsync(request);
 
-            // Update local database
-            user.GetType().GetProperty("Name").SetValue(user, newName);
-
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Username updated successfully" });
+            return Ok(new { message = "Display name updated successfully" });
         }
 
         // DELETE: api/Users/{id}
@@ -85,7 +95,7 @@ namespace OpenEdAI.Controllers
             // Delete user from Cognito
             var deleteRequest = new AdminDeleteUserRequest
             {
-                UserPoolId = "", // Cognito User Pool ID
+                UserPoolId = _userPoolId, // Cognito User Pool ID
                 Username = id
             };
 
