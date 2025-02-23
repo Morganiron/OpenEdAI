@@ -19,5 +19,10 @@ namespace OpenEdAI.Models
         [Required]
         public string Role { get; private set; } // "Student", "Admin"
 
+        public void UpdateName(string newName)
+        {
+            Name = newName;
+        }
+
     }
 }
