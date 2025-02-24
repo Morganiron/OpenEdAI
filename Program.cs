@@ -7,6 +7,7 @@ using OpenEdAI.Data;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Protocols;
 using System.IdentityModel.Tokens.Jwt;
+using Amazon.CognitoIdentityProvider;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
 
 // Disable Claims mapping
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
