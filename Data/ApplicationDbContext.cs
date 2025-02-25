@@ -19,11 +19,17 @@ namespace OpenEdAI.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<Student>().HasBaseType<User>();
+
             modelBuilder.Entity<Course>()
             .HasMany(c => c.Lessons)
             .WithOne(l => l.Course)
             .HasForeignKey(l => l.CourseID)
             .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CourseProgress>()
+                .Property(cp => cp.CompletedLessonsJson)
+                .HasColumnType("json"); // Ensures it's stored as JSON in MySQL
 
             modelBuilder.Entity<CourseProgress>()
             .HasOne(cp => cp.Course)

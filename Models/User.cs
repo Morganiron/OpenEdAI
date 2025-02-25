@@ -19,6 +19,19 @@ namespace OpenEdAI.Models
         [Required]
         public string Role { get; private set; } // "Student", "Admin"
 
+
+        // Default constructor
+        public User() { }
+
+
+        public User(string userId, string name, string email, string role)
+        {
+            UserID = userId ?? throw new ArgumentException(nameof(userId)); // Prevent null values
+            Name = name;
+            Email = email ?? throw new ArgumentException(nameof(email));
+            Role = role ?? throw new ArgumentException(nameof(role));
+        }
+
         public void UpdateName(string newName)
         {
             Name = newName;

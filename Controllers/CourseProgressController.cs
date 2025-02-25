@@ -22,7 +22,11 @@ namespace OpenEdAI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<CourseProgress>>> GetProgress()
         {
-            return await _context.CourseProgress.ToListAsync();
+            var progressList = await _context.CourseProgress
+                .Include(cp => cp.Course)
+                .ToListAsync();
+
+            return Ok(progressList);
         }
 
         // GET: api/CourseProgress/{id}

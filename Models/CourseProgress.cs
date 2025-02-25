@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace OpenEdAI.Models
 {
@@ -24,9 +25,27 @@ namespace OpenEdAI.Models
 
         public int LessonsCompleted { get; private set; } // Track number of lessons completed from course
 
-        public double CompletionPercentage => (double)LessonsCompleted / Course.TotalLessons * 100;
+        // JSON column for complted lessons
+        public string CompletedLessonsJson { get; private set; }
 
-        public virtual ICollection<int> CompletedLessons { get; private set; } = new List<int>(); // Stores completed LessonIDs
+        [NotMapped] // Exclude list from EF Core mapping, handled manually
+        public List<int> CompletedLessons
+        {   // If CompletedLessonsJson does not exist, create a new List
+            get => string.IsNullOrEmpty(CompletedLessonsJson) 
+                ? new List<int>()
+                : JsonSerializer.Deserialize<List<int>>(CompletedLessonsJson);// If it does exist, deserialize the JSON
+            
+            private set => CompletedLessonsJson = JsonSerializer.Serialize(value); // Serialize the list to JSON
+        }
+
+        public double CompletionPercentage
+        {
+            get
+            {
+                if (Course == null || Course.TotalLessons == 0) return 0;
+                return (double)LessonsCompleted / Course.TotalLessons * 100;
+            }
+        }
 
         public DateTime LastUpdated { get; private set; } = DateTime.UtcNow;
 
@@ -38,6 +57,7 @@ namespace OpenEdAI.Models
             UserName = userName;
             CourseID = courseID;
             LessonsCompleted = 0;
+            CompletedLessons = new List<int>();
         }
 
         // Update progress

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.UserSecrets;
 using OpenEdAI.Data;
 using OpenEdAI.Models;
 
@@ -66,6 +67,33 @@ namespace OpenEdAI.Controllers
                 return NotFound();
 
             return Ok(student.ProgressRecords);
+        }
+
+        // POST: api/Students
+        [HttpPost]
+        public async Task<ActionResult<Student>> CreateStudent()
+        {
+            // Extract the Cognito user id `sub` from the token
+            var userId = User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized("User ID not found in token");
+
+            // Check if the student already exists
+            var existingStudent = await _context.Students.FindAsync(userId);
+            if (existingStudent != null)
+                return Conflict("Student already exists");
+
+            // Get additional content from token
+            var name = User.FindFirst("name")?.Value ?? "Unkown";
+            var email = User.FindFirst("email")?.Value ?? "Unknown";
+
+
+            // Create new student objeck
+            var student = new Student(userId, name, email);
+
+            
+
+            return Ok();
         }
 
         // PUT: api/Students/{userId} - Update student information
