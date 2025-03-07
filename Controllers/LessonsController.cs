@@ -1,15 +1,15 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.Data;
 using OpenEdAI.Models;
+using OpenEdAI.DTOs;
 
 namespace OpenEdAI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
-    public class LessonsController : ControllerBase
+    
+    public class LessonsController : BaseController
     {
         private readonly ApplicationDbContext _context;
 
@@ -20,124 +20,114 @@ namespace OpenEdAI.Controllers
 
         // GET: api/Lessons
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Lesson>>> GetLessons()
+        public async Task<ActionResult<IEnumerable<LessonDTO>>> GetLessons()
         {
-            return await _context.Lessons.ToListAsync();
+            var lessons = await _context.Lessons
+                .Select(l => new LessonDTO
+                {
+                    LessonID = l.LessonID,
+                    Title = l.Title,
+                    Description = l.Description,
+                    ContentLink = l.ContentLink,
+                    Tags = l.Tags,
+                    CourseID = l.CourseID,
+                    CreatedDate = l.CreatedDate,
+                    UpdateDate = l.UpdateDate
+                })
+                .ToListAsync();
+
+            return Ok(lessons);
         }
 
         // GET: api/Lessons/{id}
-        [HttpGet("{id}")]
-        public async Task<ActionResult<object>> GetLesson(int id)
+        [HttpGet("{lessonId}")]
+        public async Task<ActionResult<LessonDTO>> GetLesson(int lessonId)
         {
-            var lesson = await _context.Lessons
-                .Include(l => l.Course)
-                .Include(l => l.User)
-                .FirstOrDefaultAsync(l => l.LessonID == id);
-
-            if (lesson == null) 
-                return NotFound();
-
-            return Ok(new
-            {
-                lesson.Title,
-                lesson.Description,
-                lesson.ContentLink,
-                lesson.CourseID,
-                Course = new
+            var lessonDto = await _context.Lessons
+                .Where(l => l.LessonID == lessonId)
+                .Select(l => new LessonDTO
                 {
-                    lesson.Course.Title,
-                    lesson.Course.Description,
-                    lesson.Course.Tags,
-                    lesson.Course.Owner,
-                    lesson.Course.CreatedBy,
-                    Use = new
-                    {
-                        lesson.Course.User.Name,
-                        lesson.Course.User.Email
-                    }
-                },
-                lesson.Owner,
-                lesson.UserName,
-                User = new
-                {
-                    lesson.User.Name,
-                    lesson.User.Email
-                },
-            });
+                    LessonID = l.LessonID,
+                    Title = l.Title,
+                    Description = l.Description,
+                    ContentLink = l.ContentLink,
+                    Tags = l.Tags,
+                    CourseID = l.CourseID,
+                    CreatedDate = l.CreatedDate,
+                    UpdateDate = l.UpdateDate
+                })
+                .FirstOrDefaultAsync();
+
+            return Ok(lessonDto);
         }
 
         // GET api/Lessons/Course/{id}
         [HttpGet("Course/{courseId}")]
-        public async Task<ActionResult<IEnumerable<object>>> GetLessonsByCourse(int courseId)
+        public async Task<ActionResult<IEnumerable<LessonDTO>>> GetLessonsByCourse(int courseId)
         {
             if (!await _context.Lessons.AnyAsync(l => l.CourseID == courseId))
                 return NotFound("No lessons found for this course");
 
             var lessons = await _context.Lessons
-                .Include(l => l.Course)
-                .Include(l => l.User) 
                 .Where(l => l.CourseID == courseId)
+                .Select(l => new LessonDTO
+                {
+                    LessonID = l.LessonID,
+                    Title = l.Title,
+                    Description = l.Description,
+                    ContentLink = l.ContentLink,
+                    Tags = l.Tags,
+                    CourseID = l.CourseID,
+                    CreatedDate = l.CreatedDate,
+                    UpdateDate = l.UpdateDate
+                })
                 .ToListAsync();
 
-            return Ok(lessons.Select(lesson => new
-            {
-                lesson.Title,
-                lesson.Description,
-                lesson.ContentLink,
-                lesson.CourseID,
-                Course = new
-                {
-                    lesson.Course.Title,
-                    lesson.Course.Description,
-                    lesson.Course.Tags,
-                    lesson.Course.Owner,
-                    lesson.Course.CreatedBy,
-                    Use = new
-                    {
-                        lesson.Course.User.Name,
-                        lesson.Course.User.Email
-                    }
-                },
-                lesson.Owner,
-                lesson.UserName,
-                User = new
-                {
-                    lesson.User.Name,
-                    lesson.User.Email
-                },
-            }));
+            return Ok(lessons);
         }
 
         // POST: api/Lessons
         [HttpPost]
-        public async Task<ActionResult<Lesson>> CreateLesson(Lesson lesson)
+        public async Task<ActionResult<Lesson>> CreateLesson(CreateLessonDTO createDto)
         {
-            var course = await _context.Courses.FindAsync(lesson.CourseID);
+            // Check that course exists to associate the lesson
+            var course = await _context.Courses.FindAsync(createDto.CourseID);
             if (course == null)
                 return BadRequest("Course not found");
 
-            var user = await _context.Users.FindAsync(lesson.Owner);
-            if (user == null)
-                return BadRequest("User not found");
-
-            // Associated the lesson with the course and user
-            lesson.GetType().GetProperty("Course").SetValue(lesson, course);
-            lesson.GetType().GetProperty("User").SetValue(lesson, user);
-
+            // Create a new Lesson entity using the provided data
+            var lesson = new Lesson(createDto.Title, createDto.Description, createDto.ContentLink, createDto.Tags, createDto.CourseID);
+            
             _context.Lessons.Add(lesson);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLesson), new { id = lesson.LessonID }, lesson);
+            // Map to a LessonDTO for output
+            var lessonDto = new LessonDTO
+            {
+                LessonID = lesson.LessonID,
+                Title = lesson.Title,
+                Description = lesson.Description,
+                ContentLink = lesson.ContentLink,
+                Tags = lesson.Tags,
+                CourseID = lesson.CourseID,
+                CreatedDate = lesson.CreatedDate,
+                UpdateDate = lesson.UpdateDate
+            };
+
+            return CreatedAtAction(nameof(GetLesson), new { id = lesson.LessonID }, lessonDto);
         }
 
         // PUT: api/Lessons/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateLesson(int id, Lesson lesson)
+        [HttpPut("{lessonId}")]
+        public async Task<IActionResult> UpdateLesson(int lessonId, UpdateLessonDTO updateDto)
         {
-            if (id != lesson.LessonID)
-                return BadRequest();
+            var lesson = await _context.Lessons.FindAsync(lessonId);
+            if (lesson == null)
+                return NotFound();
 
-            _context.Entry(lesson).State = EntityState.Modified;
+            // Update only allowed properties
+            lesson.UpdateLesson(updateDto.Title, updateDto.Description, updateDto.Tags, updateDto.ContentLink);
+
 
             try
             {
@@ -145,7 +135,7 @@ namespace OpenEdAI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!_context.Lessons.Any(e => e.LessonID == id))
+                if (!_context.Lessons.Any(e => e.LessonID == lessonId))
                     return NotFound();
                 else
                     throw;
@@ -155,15 +145,14 @@ namespace OpenEdAI.Controllers
         }
 
         // DELETE: api/Lessons/{id}
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteLesson(int id)
+        [HttpDelete("{lessonId}")]
+        public async Task<IActionResult> DeleteLesson(int lessonId)
         {
-            var lesson = await _context.Lessons.FindAsync(id);
+            var lesson = await _context.Lessons.FindAsync(lessonId);
             if (lesson == null)
                 return NotFound();
 
             _context.Lessons.Remove(lesson);
-
             await _context.SaveChangesAsync();
 
             return NoContent();

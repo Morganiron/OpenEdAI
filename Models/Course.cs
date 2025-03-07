@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace OpenEdAI.Models
 {
-    public class Course
+    public class Course : BaseEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)] //Auto-generate and Auto-increment course IDs
@@ -21,26 +21,29 @@ namespace OpenEdAI.Models
 
         public int TotalLessons => Lessons.Count; // Calculated dynamically
 
-        [ForeignKey("User")]
-        public string Owner { get; private set; } // AWS Cognito UserID
+        [ForeignKey("Student")]
+        public string UserID { get; private set; } // Foreign key to Student
 
         [Required]
         [StringLength(100)]
-        public string CreatedBy { get; private set; } // Stores User.Name at the time of creation
-        public virtual User User { get; private set; } // Navigation property for additional data
+        public string UserName { get; private set; } // Stores the name of the user who created the course
+        public virtual Student Creator { get; private set; } // Creator of the course
 
-        public DateTime CreatedDate { get; private set; } = DateTime.UtcNow;
-        public DateTime UpdateDate { get; private set; } = DateTime.UtcNow;
+        public virtual ICollection<Student> EnrolledStudents { get; private set; } = new List<Student>(); // Students enrolled in the course
 
 
-        // Constructor
-        public Course(string title, string description, List<string> tags, string owner, string createdBy)
+
+        // Base Constructor
+        internal Course() { } // EF Core required
+
+        // Constructor for creating a new course
+        public Course(string title, string description, List<string> tags, string userId, string userName)
         {
             Title = title;
             Description = description;
             Tags = tags;
-            Owner = owner;
-            CreatedBy = createdBy;
+            UserID = userId;
+            UserName = userName;
         }
 
         public void UpdateCourse(string title, string description, List<string> tags)
@@ -48,7 +51,12 @@ namespace OpenEdAI.Models
             Title = title;
             Description = description;
             Tags = tags;
-            UpdateDate = DateTime.UtcNow;
+        }
+
+        public void ReassignCreator(string newUserId, string newUserName)
+        {
+            UserID = newUserId;
+            UserName = newUserName;
         }
 
 

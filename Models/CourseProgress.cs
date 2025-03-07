@@ -4,20 +4,20 @@ using System.Text.Json;
 
 namespace OpenEdAI.Models
 {
-    public class CourseProgress
+    public class CourseProgress : BaseEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int ProgressID { get; private set; }
 
-        [ForeignKey("User")]
-        public string Owner { get; private set; } // AWS Cognito UserID
+        [ForeignKey("Student")]
+        public string UserID { get; private set; } // AWS Cognito UserID or 'sub'
 
         [Required]
         [StringLength(100)]
         public string UserName { get; private set; }
 
-        public virtual User User { get; private set; }
+        public virtual Student Student { get; private set; }
 
         [ForeignKey("Course")]
         public int CourseID { get; private set; }
@@ -43,17 +43,17 @@ namespace OpenEdAI.Models
             get
             {
                 if (Course == null || Course.TotalLessons == 0) return 0;
-                return (double)LessonsCompleted / Course.TotalLessons * 100;
+                // Math.Floor will drop any decimals without rounding up or down.
+                return Math.Floor((double)LessonsCompleted / Course.TotalLessons * 100);
             }
         }
 
-        public DateTime LastUpdated { get; private set; } = DateTime.UtcNow;
-
-        
         // Constructor
-        public CourseProgress(string owner, string userName, int courseID)
+        internal CourseProgress() { } // EF Core required
+
+        public CourseProgress(string userId, string userName, int courseID)
         {
-            Owner = owner;
+            UserID = userId;
             UserName = userName;
             CourseID = courseID;
             LessonsCompleted = 0;
@@ -63,11 +63,26 @@ namespace OpenEdAI.Models
         // Update progress
         public void MarkLessonCompleted(int lessonID)
         {
-            if (!CompletedLessons.Contains(lessonID))
+            // Get the current list of completed lessons
+            List<int> current;
+            if (string.IsNullOrEmpty(CompletedLessonsJson))
             {
-                CompletedLessons.Add(lessonID);
+                current = new List<int>();
+            }
+            else
+            {
+                current = JsonSerializer.Deserialize<List<int>>(CompletedLessonsJson);
+            }
+            
+
+            if (!current.Contains(lessonID))
+            {
+                current.Add(lessonID);
                 LessonsCompleted++;
-                LastUpdated = DateTime.UtcNow;
+                UpdateDate = DateTime.UtcNow;
+
+                //Reassign the property so that the JSON is updated
+                CompletedLessonsJson = JsonSerializer.Serialize(current);
             }
         }
 

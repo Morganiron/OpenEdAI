@@ -16,23 +16,19 @@ namespace OpenEdAI.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Users",
+                name: "Students",
                 columns: table => new
                 {
                     UserID = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Name = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    UserName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Email = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Role = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Discriminator = table.Column<string>(type: "varchar(8)", maxLength: 8, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Users", x => x.UserID);
+                    table.PrimaryKey("PK_Students", x => x.UserID);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -48,53 +44,44 @@ namespace OpenEdAI.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Tags = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Owner = table.Column<string>(type: "varchar(255)", nullable: false)
+                    UserID = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    CreatedBy = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    UserName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    UpdateDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    StudentUserID = table.Column<string>(type: "varchar(255)", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4")
+                    UpdateDate = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Courses", x => x.CourseID);
                     table.ForeignKey(
-                        name: "FK_Courses_Users_Owner",
-                        column: x => x.Owner,
-                        principalTable: "Users",
+                        name: "FK_Courses_Students_UserID",
+                        column: x => x.UserID,
+                        principalTable: "Students",
                         principalColumn: "UserID",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Courses_Users_StudentUserID",
-                        column: x => x.StudentUserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID");
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "CourseProgress",
+                name: "CourseProgressDTO",
                 columns: table => new
                 {
-                    ProgessID = table.Column<int>(type: "int", nullable: false)
+                    ProgressID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    Owner = table.Column<string>(type: "varchar(255)", nullable: false)
+                    UserID = table.Column<string>(type: "varchar(255)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     UserName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CourseID = table.Column<int>(type: "int", nullable: false),
                     LessonsCompleted = table.Column<int>(type: "int", nullable: false),
-                    CompletedLessons = table.Column<string>(type: "longtext", nullable: false)
+                    CompletedLessonsJson = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    LastUpdated = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    StudentUserID = table.Column<string>(type: "varchar(255)", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4")
+                    LastUpdated = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CourseProgress", x => x.ProgessID);
+                    table.PrimaryKey("PK_CourseProgress", x => x.ProgressID);
                     table.ForeignKey(
                         name: "FK_CourseProgress_Courses_CourseID",
                         column: x => x.CourseID,
@@ -102,16 +89,11 @@ namespace OpenEdAI.Migrations
                         principalColumn: "CourseID",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_CourseProgress_Users_Owner",
-                        column: x => x.Owner,
-                        principalTable: "Users",
+                        name: "FK_CourseProgress_Students_UserID",
+                        column: x => x.UserID,
+                        principalTable: "Students",
                         principalColumn: "UserID",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CourseProgress_Users_StudentUserID",
-                        column: x => x.StudentUserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID");
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -130,10 +112,6 @@ namespace OpenEdAI.Migrations
                     Tags = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CourseID = table.Column<int>(type: "int", nullable: false),
-                    Owner = table.Column<string>(type: "varchar(255)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    UserName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedDate = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     UpdateDate = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
@@ -146,10 +124,30 @@ namespace OpenEdAI.Migrations
                         principalTable: "Courses",
                         principalColumn: "CourseID",
                         onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "StudentCourses",
+                columns: table => new
+                {
+                    CourseID = table.Column<int>(type: "int", nullable: false),
+                    StudentID = table.Column<string>(type: "varchar(255)", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StudentCourses", x => new { x.CourseID, x.StudentID });
                     table.ForeignKey(
-                        name: "FK_Lessons_Users_Owner",
-                        column: x => x.Owner,
-                        principalTable: "Users",
+                        name: "FK_StudentCourses_Course",
+                        column: x => x.CourseID,
+                        principalTable: "Courses",
+                        principalColumn: "CourseID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_StudentCourses_Student",
+                        column: x => x.StudentID,
+                        principalTable: "Students",
                         principalColumn: "UserID",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -157,28 +155,18 @@ namespace OpenEdAI.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "IX_CourseProgress_CourseID",
-                table: "CourseProgress",
+                table: "CourseProgressDTO",
                 column: "CourseID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CourseProgress_Owner",
-                table: "CourseProgress",
-                column: "Owner");
+                name: "IX_CourseProgress_UserID",
+                table: "CourseProgressDTO",
+                column: "UserID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CourseProgress_StudentUserID",
-                table: "CourseProgress",
-                column: "StudentUserID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Courses_Owner",
+                name: "IX_Courses_UserID",
                 table: "Courses",
-                column: "Owner");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Courses_StudentUserID",
-                table: "Courses",
-                column: "StudentUserID");
+                column: "UserID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Lessons_CourseID",
@@ -186,25 +174,28 @@ namespace OpenEdAI.Migrations
                 column: "CourseID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Lessons_Owner",
-                table: "Lessons",
-                column: "Owner");
+                name: "IX_StudentCourses_StudentID",
+                table: "StudentCourses",
+                column: "StudentID");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "CourseProgress");
+                name: "CourseProgressDTO");
 
             migrationBuilder.DropTable(
                 name: "Lessons");
 
             migrationBuilder.DropTable(
+                name: "StudentCourses");
+
+            migrationBuilder.DropTable(
                 name: "Courses");
 
             migrationBuilder.DropTable(
-                name: "Users");
+                name: "Students");
         }
     }
 }

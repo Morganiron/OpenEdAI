@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace OpenEdAI.Models
 {
-    public class Lesson
+    public class Lesson : BaseEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -19,31 +19,18 @@ namespace OpenEdAI.Models
         [ForeignKey("Course")]
         public int CourseID { get; private set; }
         public virtual Course Course { get; private set; } // Ensures the lesson is linked to the Course
-
-        [ForeignKey("User")]
-        public string Owner { get; private set; } // AWS Cognito UserID
-
-        [Required]
-        [StringLength(100)]
-        public string UserName { get; private set; }
-        public virtual User User { get; private set; }
-
-        public DateTime CreatedDate { get; private set; } = DateTime.UtcNow;
-        public DateTime UpdateDate { get; private set; } = DateTime.UtcNow;
-
         
         // Constructors
 
-        private Lesson() { } // EF Core required
+        internal Lesson() { } // EF Core required
 
-        public Lesson(string title, string description, string contentLink, int courseID, string owner, string userName)
+        public Lesson(string title, string description, string contentLink, List<string>tags, int courseID)
         {
             Title = title;
             Description = description;
             ContentLink = contentLink;
+            Tags = tags;
             CourseID = courseID;
-            Owner = owner;
-            UserName = userName;
         }
 
         // Update Method
@@ -53,7 +40,6 @@ namespace OpenEdAI.Models
             Description = description;
             ContentLink = contentLink;
             Tags = tags;
-            UpdateDate = DateTime.UtcNow;
         }
     }
 }

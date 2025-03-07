@@ -12,18 +12,33 @@ using OpenEdAI.Data;
 namespace OpenEdAI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250224193858_UpdateDatabaseSchema")]
-    partial class UpdateDatabaseSchema
+    [Migration("20250305011036_RenameStudentCoursesToCourseEnrollments")]
+    partial class RenameStudentCoursesToCourseEnrollments
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.2")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("CourseEnrollments", b =>
+                {
+                    b.Property<int>("CourseID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StudentID")
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("CourseID", "StudentID");
+
+                    b.HasIndex("StudentID");
+
+                    b.ToTable("CourseEnrollments", (string)null);
+                });
 
             modelBuilder.Entity("OpenEdAI.Models.Course", b =>
                 {
@@ -33,11 +48,6 @@ namespace OpenEdAI.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("CourseID"));
 
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime(6)");
 
@@ -45,14 +55,7 @@ namespace OpenEdAI.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Owner")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("StudentUserID")
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Tags")
+                    b.PrimitiveCollection<string>("Tags")
                         .IsRequired()
                         .HasColumnType("longtext");
 
@@ -64,11 +67,18 @@ namespace OpenEdAI.Migrations
                     b.Property<DateTime>("UpdateDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("UserID")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.HasKey("CourseID");
 
-                    b.HasIndex("Owner");
-
-                    b.HasIndex("StudentUserID");
+                    b.HasIndex("UserID");
 
                     b.ToTable("Courses");
                 });
@@ -88,17 +98,14 @@ namespace OpenEdAI.Migrations
                     b.Property<int>("CourseID")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("LastUpdated")
+                    b.Property<DateTime>("UpdateDate")
                         .HasColumnType("datetime(6)");
 
                     b.Property<int>("LessonsCompleted")
                         .HasColumnType("int");
 
-                    b.Property<string>("Owner")
+                    b.Property<string>("UserID")
                         .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("StudentUserID")
                         .HasColumnType("varchar(255)");
 
                     b.Property<string>("UserName")
@@ -110,9 +117,7 @@ namespace OpenEdAI.Migrations
 
                     b.HasIndex("CourseID");
 
-                    b.HasIndex("Owner");
-
-                    b.HasIndex("StudentUserID");
+                    b.HasIndex("UserID");
 
                     b.ToTable("CourseProgress");
                 });
@@ -139,11 +144,7 @@ namespace OpenEdAI.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Owner")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Tags")
+                    b.PrimitiveCollection<string>("Tags")
                         .IsRequired()
                         .HasColumnType("longtext");
 
@@ -155,73 +156,59 @@ namespace OpenEdAI.Migrations
                     b.Property<DateTime>("UpdateDate")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("UserName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
                     b.HasKey("LessonID");
 
                     b.HasIndex("CourseID");
 
-                    b.HasIndex("Owner");
-
                     b.ToTable("Lessons");
                 });
 
-            modelBuilder.Entity("OpenEdAI.Models.User", b =>
+            modelBuilder.Entity("OpenEdAI.Models.Student", b =>
                 {
                     b.Property<string>("UserID")
                         .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Discriminator")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("varchar(8)");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
                     b.HasKey("UserID");
 
-                    b.ToTable("Users");
-
-                    b.HasDiscriminator<string>("Discriminator").HasValue("User");
-
-                    b.UseTphMappingStrategy();
+                    b.ToTable("Students");
                 });
 
-            modelBuilder.Entity("OpenEdAI.Models.Student", b =>
+            modelBuilder.Entity("CourseEnrollments", b =>
                 {
-                    b.HasBaseType("OpenEdAI.Models.User");
+                    b.HasOne("OpenEdAI.Models.Course", null)
+                        .WithMany()
+                        .HasForeignKey("CourseID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_StudentCourses_Course");
 
-                    b.HasDiscriminator().HasValue("Student");
+                    b.HasOne("OpenEdAI.Models.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_StudentCourses_Student");
                 });
 
             modelBuilder.Entity("OpenEdAI.Models.Course", b =>
                 {
-                    b.HasOne("OpenEdAI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("Owner")
+                    b.HasOne("OpenEdAI.Models.Student", "Creator")
+                        .WithMany("CreatorCourses")
+                        .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("OpenEdAI.Models.Student", null)
-                        .WithMany("Courses")
-                        .HasForeignKey("StudentUserID");
-
-                    b.Navigation("User");
+                    b.Navigation("Creator");
                 });
 
             modelBuilder.Entity("OpenEdAI.Models.CourseProgress", b =>
@@ -232,19 +219,15 @@ namespace OpenEdAI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("OpenEdAI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("Owner")
+                    b.HasOne("OpenEdAI.Models.Student", "Student")
+                        .WithMany("ProgressRecords")
+                        .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("OpenEdAI.Models.Student", null)
-                        .WithMany("ProgressRecords")
-                        .HasForeignKey("StudentUserID");
-
                     b.Navigation("Course");
 
-                    b.Navigation("User");
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("OpenEdAI.Models.Lesson", b =>
@@ -255,15 +238,7 @@ namespace OpenEdAI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("OpenEdAI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("Owner")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Course");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OpenEdAI.Models.Course", b =>
@@ -273,7 +248,7 @@ namespace OpenEdAI.Migrations
 
             modelBuilder.Entity("OpenEdAI.Models.Student", b =>
                 {
-                    b.Navigation("Courses");
+                    b.Navigation("CreatorCourses");
 
                     b.Navigation("ProgressRecords");
                 });

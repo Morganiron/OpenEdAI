@@ -1,16 +1,15 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.Data;
 using OpenEdAI.Models;
+using OpenEdAI.DTOs;
 
 namespace OpenEdAI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
-    public class CoursesController : ControllerBase
+    
+    public class CoursesController : BaseController
     {
         private readonly ApplicationDbContext _context;
 
@@ -21,105 +20,139 @@ namespace OpenEdAI.Controllers
 
         // GET: api/Courses
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Course>>> GetCourses()
+        public async Task<ActionResult<IEnumerable<CourseDTO>>> GetCourses()
         {
             var courses = await _context.Courses
-                .Select(c => new
+                .Include(c => c.Lessons)
+                .Select(c => new CourseDTO
                 {
-                    c.CourseID,
-                    c.Title,
-                    c.Description,
-                    c.Tags,
-                    c.Owner,
-                    c.CreatedBy,
-                    c.CreatedDate,
-                    c.UpdateDate,
-                    TotalLessons = c.Lessons.Count
-
+                    CourseID = c.CourseID,
+                    Title = c.Title,
+                    Description = c.Description,
+                    Tags = c.Tags,
+                    UserID = c.UserID,
+                    // Get current userName if available to reflect UserName updates
+                    UserName = c.Creator != null ? c.Creator.UserName : c.UserName,
+                    CreatedDate = c.CreatedDate,
+                    UpdateDate = c.UpdateDate,
+                    LessonIds = c.Lessons.Select(l => l.LessonID).ToList(),
+                    EnrolledStudents = c.EnrolledStudents.Select(s => new EnrolledStudentDTO
+                    {
+                        UserID = s.UserID,
+                        UserName = s.UserName
+                    }).ToList()
                 })
                 .ToListAsync();
 
             return Ok(courses);
         }
 
-        // GET: api/Courses/{id} - Get a course and the student's progress
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Course>> GetCourse(int id)
+        // GET: api/Courses/{id} - Get a course by ID with lessons and enrolled students
+        [HttpGet("{courseId}")]
+        public async Task<ActionResult<CourseDTO>> GetCourse(int courseId)
         {
-            // Get userId from Cognito Token
-            var studentId = User.FindFirst("sub")?.Value; // Get 'sub' from JWT token
-            if (string.IsNullOrEmpty(studentId)) return Unauthorized("User ID not found in token");
-
-            var course = await _context.Courses
+           var course = await _context.Courses
                 .Include(c => c.Lessons)
-                .Include(c => c.User)
-                .FirstOrDefaultAsync(c => c.CourseID == id);
+                .Include(c => c.EnrolledStudents)
+                .FirstOrDefaultAsync(c => c.CourseID == courseId);
 
-            if (course == null) return NotFound("Course not found");
-
-            // Retrieve student's progress
-            var progress = await _context.CourseProgress
-                .Where(p => p.Owner == studentId && p.CourseID == id)
-                .FirstOrDefaultAsync();
-
-            return Ok(new
+            if (course == null)
             {
-                course.CourseID,
-                course.Title,
-                course.Description,
-                course.Tags,
-                course.Owner,
-                OwnerInfo = course.User == null ? null : new
-                {
-                    course.User.Name,
-                    course.User.Email
-                },
-                course.CreatedBy,
-                course.CreatedDate,
-                course.UpdateDate,
+                return NotFound("Course not found");
+            }
 
-                // Lessons for this course
-                Lessons = course.Lessons.Select(lesson => new
+            var courseDetail = new CourseDTO
+            {
+                CourseID = course.CourseID,
+                Title = course.Title,
+                Description = course.Description,
+                Tags = course.Tags,
+                UserID = course.UserID,
+                UserName = course.Creator != null ? course.Creator.UserName : course.UserName,
+                CreatedDate = course.CreatedDate,
+                UpdateDate = course.UpdateDate,
+                LessonIds = course.Lessons.Select(l => l.LessonID).ToList(),
+                EnrolledStudents = course.EnrolledStudents.Select(s => new EnrolledStudentDTO
                 {
-                    lesson.LessonID,
-                    lesson.CourseID,
-                    lesson.Title,
-                    lesson.Description,
-                    lesson.ContentLink,
-                    lesson.Tags,
-                    lesson.CreatedDate,
-                }),
+                    UserID = s.UserID,
+                    UserName = s.UserName
+                }).ToList()
+            };
 
-                // Student's progress in this course (if it exists)
-                Progress = progress == null ? null : new
-                {
-                    progress.ProgressID,
-                    progress.Owner,
-                    progress.CourseID,
-                    progress.LessonsCompleted,
-                    progress.CompletedLessons,
-                    progress.CompletionPercentage,
-                    progress.LastUpdated
-
-                }
-            });
+            return Ok(courseDetail);
         }
 
         // POST: api/Courses
         [HttpPost]
-        public async Task<ActionResult<Course>> CreateCourse(Course course)
+        public async Task<ActionResult<CourseDTO>> CreateCourse(CreateCourseDTO createDto)
         {
+            // Create a new Course instance using the provided data
+            var course = new Course(createDto.Title, createDto.Description, createDto.Tags, createDto.UserID, createDto.UserName);
+
             _context.Courses.Add(course);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetCourse), new { id = course.CourseID }, course);
+
+            // Add student to the course as an enrolled student
+            var creator = await _context.Students.FindAsync(course.UserID);
+            if (creator != null)
+            {
+                course.EnrolledStudents.Add(creator);
+                await _context.SaveChangesAsync();
+            }
+
+            // Reload the course to ensure the enrolled students collection is loaded
+            await _context.Entry(course).Collection(c => c.EnrolledStudents).LoadAsync();
+
+            var courseDto = new CourseDTO
+            {
+                CourseID = course.CourseID,
+                Title = course.Title,
+                Description = course.Description,
+                Tags = course.Tags,
+                UserID = course.UserID,
+                UserName = course.Creator != null ? course.Creator.UserName : course.UserName,
+                CreatedDate = course.CreatedDate,
+                UpdateDate = course.UpdateDate,
+                LessonIds = course.Lessons.Select(l => l.LessonID).ToList(),
+                EnrolledStudents = course.EnrolledStudents.Select(s => new EnrolledStudentDTO
+                {
+                    UserID = s.UserID,
+                    UserName = s.UserName
+                }).ToList()
+            };
+
+            return CreatedAtAction(nameof(GetCourse), new { courseId = course.CourseID }, courseDto);
+        }
+
+        // POST: api/Courses/{courseId}/EnrollStudent/{studentId}
+        [HttpPost("{courseId}/EnrollStudent/{studentId}")]
+        public async Task<IActionResult> EnrollStudent(int courseId, string studentId)
+        {
+            var course = await _context.Courses.FindAsync(courseId);
+            var student = await _context.Students.FindAsync(studentId);
+
+            if (course == null || student == null)
+                return NotFound("Course or Student not found");
+
+            // Add the student to the course's enrolled students collection
+            course.EnrolledStudents.Add(student);
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
         // PUT: api/Courses
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCourse(int id, Course course)
+        public async Task<IActionResult> UpdateCourse(int id, UpdateCourseDTO updateDto)
         {
-            if (id != course.CourseID) return BadRequest();
-            _context.Entry(course).State = EntityState.Modified;
+            var course = await _context.Courses.FindAsync(id);
+            if (course == null)
+            {
+                return NotFound();
+            }
+
+            course.UpdateCourse(updateDto.Title, updateDto.Description, updateDto.Tags);
 
             try
             {
@@ -128,9 +161,13 @@ namespace OpenEdAI.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!_context.Courses.Any(e => e.CourseID == id))
+                {
                     return NotFound();
-                else 
+                }
+                else
+                {
                     throw;
+                }
             }
 
             return NoContent();
@@ -144,6 +181,35 @@ namespace OpenEdAI.Controllers
             if (course == null) return NotFound();
 
             _context.Courses.Remove(course);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // DELETE: api/Courses/{courseId}/UnenrollStudent/{studentId}
+        [HttpDelete("{courseId}/UnenrollStudent/{studentId}")]
+        public async Task<IActionResult> UnenrollStudent(int courseId, string studentId)
+        {
+            // Retrieve the course including it's EnrolledStudents collection
+            var course = await _context.Courses
+                .Include(c => c.EnrolledStudents)
+                .FirstOrDefaultAsync(c => c.CourseID == courseId);
+
+            if (course == null)
+                return NotFound("Course not found");
+
+            // Retrieve the student
+            var student = await _context.Students.FindAsync(studentId);
+            if (student == null)
+                return NotFound("Stdudent not found");
+
+            // Remove the student from the enrolled students collection
+            if (!course.EnrolledStudents.Contains(student))
+                return BadRequest("Student is not enrolled in this course");
+
+            course.EnrolledStudents.Remove(student);
+
+            // Save changes. Cascade delete should remove the corresponding join table entry
             await _context.SaveChangesAsync();
 
             return NoContent();
