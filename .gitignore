@@ -388,3 +388,4 @@ wwwroot/css/site.css
 .dockerignore
 Dockerfile
 docker-compose.yml
+*.patch

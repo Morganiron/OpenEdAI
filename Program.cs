@@ -14,8 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Load configurations
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    // Load user secrets only in development
     .AddUserSecrets<Program>();
 
+// Get the connection string for the database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Add services to the container.
@@ -24,7 +26,6 @@ builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
 
 // Disable Claims mapping
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
-
 
 // Configure AWS options
 builder.Services.Configure<AWSOptions>(builder.Configuration.GetSection("AWS"));
@@ -55,6 +56,9 @@ var configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
     new HttpDocumentRetriever() { RequireHttps = true }
     );
 
+var openIdConfig = configurationManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
+var signingKeys = openIdConfig.SigningKeys;
+
 // Configure Authentication with Cognito JWT Tokens
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -67,41 +71,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidIssuer = cognitoAuthority,
 
-            ValidateAudience = false, // Do not validate `aud`. It is not included in access tokens from cognito.
+            ValidateAudience = false,
 
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            IssuerSigningKeys = signingKeys,
 
-            // Get signing keys dynamically from Cognito
-            IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
-            {
-                var config = configurationManager.GetConfigurationAsync(CancellationToken.None);
-                return config.Result.SigningKeys;
-            },
-
+            //// Get signing keys dynamically from Cognito
+            //IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
+            //{
+            //    var config = configurationManager.GetConfigurationAsync(CancellationToken.None);
+            //    return config.Result.SigningKeys;
+            //},
+            // Set the claim types which will be used to map the claims from the JWT token to the ClaimsPrincipal
             NameClaimType = "username",
-            //RoleClaimType = "cognito:groups"
+            RoleClaimType = "cognito:groups"
 
         };
-
+        // Add custom validation logic to check the client_id
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
             {
-                //var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-
-                // Debug - Log all claims from the principal
-                //foreach (var claim in context.Principal.Claims)
-                //{
-                //    logger.LogInformation("Claim: {Type} = {Value}", claim.Type, claim.Value);
-                //}
-
                 // Retrieve the client_id from the principal
                 var tokenClientId = context.Principal.FindFirst("client_id")?.Value;
-
-                // Debug
-                //logger.LogInformation("Token client_id: '{TokenClientId}'", tokenClientId);
-                //logger.LogInformation("Configured appClientId: '{AppClientId}'", appClientId);
 
                 if (string.IsNullOrWhiteSpace(tokenClientId) || tokenClientId.Trim() != appClientId.Trim())
                 {
@@ -124,7 +117,7 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your JWT token",
+        Description = "Enter your JWT token",
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
@@ -156,7 +149,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-//app.UseHttpsRedirection(); // Remove, messes up authentication
+app.UseHttpsRedirection();
 
 // Enable authentication & authorization middleware
 app.UseAuthentication();
