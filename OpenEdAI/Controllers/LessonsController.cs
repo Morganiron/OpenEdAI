@@ -11,7 +11,7 @@ namespace OpenEdAI.Controllers
     
     public class LessonsController : BaseController
     {
-        private readonly ApplicationDbContext _context;
+        private ApplicationDbContext _context;
 
         public LessonsController(ApplicationDbContext context)
         {

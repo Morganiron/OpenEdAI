@@ -11,12 +11,14 @@ namespace OpenEdAI.Controllers
     
     public class CoursesController : BaseController
     {
-        private readonly ApplicationDbContext _context;
+        private ApplicationDbContext _context;
 
         public CoursesController(ApplicationDbContext context)
         {
             _context = context;
         }
+
+        
 
         // GET: api/Courses
         [HttpGet]

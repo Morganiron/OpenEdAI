@@ -10,7 +10,7 @@ namespace OpenEdAI.Controllers
     [ApiController]
     public class StudentsController : BaseController
     {
-        private readonly ApplicationDbContext _context;
+        private ApplicationDbContext _context;
 
         public StudentsController(ApplicationDbContext context)
         {

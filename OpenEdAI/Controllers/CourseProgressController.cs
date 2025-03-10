@@ -11,7 +11,7 @@ namespace OpenEdAI.Controllers
     
     public class CourseProgressController : BaseController
     {
-        private readonly ApplicationDbContext _context;
+        private ApplicationDbContext _context;
 
         public CourseProgressController(ApplicationDbContext context)
         {
