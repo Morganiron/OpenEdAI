@@ -11,14 +11,10 @@ namespace OpenEdAI.Tests.TestHelpers
         protected readonly ApplicationDbContext _context;
         protected readonly ControllerBase _testController;
 
-        public BaseTest(ControllerBase controller)
+        public BaseTest()
         {
+            // Create a single shared DbContext instance
             _context = InMemoryDbContextFactory.Create();
-            _testController = controller;
-            _testController.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext { User = GetMockUser() }
-            };
         }
 
         protected ClaimsPrincipal GetMockUser()
