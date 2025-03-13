@@ -203,7 +203,7 @@ namespace OpenEdAI.Controllers
             // Retrieve the student
             var student = await _context.Students.FindAsync(studentId);
             if (student == null)
-                return NotFound("Stdudent not found");
+                return NotFound("Student not found");
 
             // Remove the student from the enrolled students collection
             if (!course.EnrolledStudents.Contains(student))
