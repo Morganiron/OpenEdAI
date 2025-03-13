@@ -88,6 +88,12 @@ namespace OpenEdAI.Controllers
         [HttpPost]
         public async Task<ActionResult<CourseDTO>> CreateCourse(CreateCourseDTO createDto)
         {
+            // Check if the incoming DTO is valid based on the [Required] attributes
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             // Create a new Course instance using the provided data
             var course = new Course(createDto.Title, createDto.Description, createDto.Tags, createDto.UserID, createDto.UserName);
 
@@ -136,6 +142,13 @@ namespace OpenEdAI.Controllers
             if (course == null || student == null)
                 return NotFound("Course or Student not found");
 
+            // Check if the student is already enrolled
+            if (course.EnrolledStudents.Any(s => s.UserID == student.UserID))
+            {
+                // If already enrolled, do not add again
+                return NoContent();
+            }
+
             // Add the student to the course's enrolled students collection
             course.EnrolledStudents.Add(student);
 
@@ -152,6 +165,16 @@ namespace OpenEdAI.Controllers
             if (course == null)
             {
                 return NotFound();
+            }
+
+            if (String.IsNullOrEmpty(updateDto.Title))
+            {
+                return BadRequest("Title cannot be empty");
+            }
+
+            if (String.IsNullOrEmpty(updateDto.Description))
+            {
+                return BadRequest("Description cannot be empty");
             }
 
             course.UpdateCourse(updateDto.Title, updateDto.Description, updateDto.Tags);
