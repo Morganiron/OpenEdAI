@@ -58,6 +58,11 @@ namespace OpenEdAI.Controllers
                 })
                 .FirstOrDefaultAsync();
 
+            if (lessonDto == null)
+            {
+                return BadRequest("Invalid lesson ID");
+            }
+
             return Ok(lessonDto);
         }
 
