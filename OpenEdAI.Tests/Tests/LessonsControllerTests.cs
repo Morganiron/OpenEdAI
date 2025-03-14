@@ -202,7 +202,7 @@ namespace OpenEdAI.Tests.Tests
             // Act: Attempt to delete the lesson
             var result = await _controller.DeleteLesson(lesson.LessonID);
 
-            // Assert: Ensure NotContent result and the lesson is deleted
+            // Assert: Ensure NoContent result and the lesson is deleted
             Assert.IsType<NoContentResult>(result);
             var deletedLesson = await _context.Lessons.FindAsync(lesson.LessonID);
             Assert.Null(deletedLesson);
