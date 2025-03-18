@@ -49,12 +49,12 @@ namespace OpenEdAI.Controllers
             return Ok(studentDTO);
         }
 
-        // GET: api/Students/{userId}/CreatorCourses - Get all courses for a student
+        // GET: api/Students/{userId}/CreatorCourses - Get all courses that a student has created
         [HttpGet("{userId}/CreatorCourses")]
-        public async Task<ActionResult<IEnumerable<CourseDTO>>> GetStudentCourses(string userId)
+        public async Task<ActionResult<IEnumerable<CourseDTO>>> GetCreatedCourses(string userId)
         {
             // Check if the student exists
-            var student = await _context.Students.FindAsync();
+            var student = await _context.Students.FindAsync(userId);
 
             if (student == null)
             {
