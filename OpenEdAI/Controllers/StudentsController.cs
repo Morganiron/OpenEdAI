@@ -21,7 +21,8 @@ namespace OpenEdAI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Student>>> GetStudents()
         {
-            return await _context.Students.ToListAsync();
+            var students = await _context.Students.ToListAsync();
+            return Ok(students);
         }
 
         // GET: api/Students/{userId}
