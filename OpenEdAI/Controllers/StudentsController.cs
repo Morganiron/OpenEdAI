@@ -84,6 +84,40 @@ namespace OpenEdAI.Controllers
             return Ok(courses);
         }
 
+        // GET: api/Students/{userId}/EnrolledCourses - Get all courses that a student is enrolled in
+        [HttpGet("{userId}/EnrolledCourses")]
+        public async Task<ActionResult<IEnumerable<CourseDTO>>> GetEnrolledCourses(string userId)
+        {
+            // Check if the student exists
+            var student = await _context.Students
+                .Include(s => s.EnrolledCourses)
+                .FirstOrDefaultAsync(s => s.UserID == userId);
+
+            if (student == null)
+            {
+                return NotFound("Student not found");
+            }
+
+            if (student.EnrolledCourses.Count == 0)
+                return NotFound("No enrolled courses");
+
+            var courses = student.EnrolledCourses
+                .Select(c => new CourseDTO
+                {
+                    CourseID = c.CourseID,
+                    Title = c.Title,
+                    Description = c.Description,
+                    Tags = c.Tags,
+                    UserID = c.UserID,
+                    UserName = c.UserName,
+                    CreatedDate = c.CreatedDate,
+                    UpdateDate = c.UpdateDate,
+                    LessonIds = c.Lessons.Select(l => l.LessonID).ToList()
+                }).ToList();
+
+            return Ok(courses);
+        }
+
         // GET: api/Students/{userId}/Progress - Get all progress records for a student
         [HttpGet("{userId}/Progress")]
         public async Task<ActionResult<IEnumerable<CourseProgressDTO>>> GetStudentProgress(string userId)
