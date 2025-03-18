@@ -123,7 +123,7 @@ namespace OpenEdAI.Controllers
         public async Task<ActionResult<IEnumerable<CourseProgressDTO>>> GetStudentProgress(string userId)
         {
             // Check if the student exists
-            var student = await _context.Students.FindAsync();
+            var student = await _context.Students.FindAsync(userId);
 
             if (student == null)
             {
