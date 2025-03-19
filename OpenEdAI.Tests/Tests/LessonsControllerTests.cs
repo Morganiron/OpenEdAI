@@ -6,11 +6,12 @@ using System.Threading.Tasks;
 using OpenEdAI.Tests.TestHelpers;
 using Xunit;
 using OpenEdAI.Models;
-using OpenEdAI.Controllers;
 using OpenEdAI.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Controllers;
 
 namespace OpenEdAI.Tests.Tests
 {

@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Client;
-using OpenEdAI.Data;
+using OpenEdAI.API.Data;
 
 namespace OpenEdAI.Tests.TestHelpers
 {

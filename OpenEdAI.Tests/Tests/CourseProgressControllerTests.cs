@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using OpenEdAI.Controllers;
 using OpenEdAI.Data;
 using OpenEdAI.Models;
-using OpenEdAI.DTOs;
 using OpenEdAI.Tests.TestHelpers;
 using Xunit;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using OpenEdAI.API.Controllers;
+using OpenEdAI.API.DTOs;
 
 namespace OpenEdAI.Tests.Tests
 {

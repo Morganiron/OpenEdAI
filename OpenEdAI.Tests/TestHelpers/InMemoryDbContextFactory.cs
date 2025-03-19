@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using OpenEdAI.Data;
+using OpenEdAI.API.Data;
+using OpenEdAI.API.Models;
 using OpenEdAI.Models;
 
 

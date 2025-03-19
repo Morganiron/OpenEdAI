@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenEdAI.Controllers;
-using OpenEdAI.DTOs;
-using OpenEdAI.Models;
+using OpenEdAI.API.Controllers;
+using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Models;
 using OpenEdAI.Tests.TestHelpers;
 using Xunit;
 
