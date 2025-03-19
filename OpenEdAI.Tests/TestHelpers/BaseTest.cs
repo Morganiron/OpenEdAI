@@ -17,13 +17,27 @@ namespace OpenEdAI.Tests.TestHelpers
             _context = InMemoryDbContextFactory.Create();
         }
 
-        protected ClaimsPrincipal GetMockUser()
+        protected ClaimsPrincipal GetMockUser(string userId = "student-003")
         {
-            return new ClaimsPrincipal(new ClaimsIdentity(new[]
+            // Regular student user
+            var identity = new ClaimsIdentity(new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, "Admin-001"),
+                new Claim("sub", userId)
+            }, "mock");
+
+            return new ClaimsPrincipal(identity);
+        }
+
+        protected ClaimsPrincipal GetMockAdmin(string adminId = "admin-001")
+        {
+            // Admin user: include the 'AdminGroup' claim
+            var identity = new ClaimsIdentity(new[]
+            {
+                new Claim("sub", adminId),
                 new Claim("cognito:groups", "AdminGroup")
-            }, "mock"));
+            }, "mock");
+
+            return new ClaimsPrincipal(identity);
         }
 
         public void Dispose()

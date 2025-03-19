@@ -241,8 +241,8 @@ namespace OpenEdAI.Tests.Tests
         [Fact]
         public async Task UpdateStudent_ValidId_ReturnsNoContent()
         {
-            // Arrange: Get an existing student and prepare an update DTO
-            var student = _context.Students.FirstOrDefault();
+            // Arrange: Get the mock student by id
+            var student = _context.Students.Find("student-003");
             Assert.NotNull(student);
             var updateDto = new UpdateStudentDTO
             {
@@ -260,7 +260,7 @@ namespace OpenEdAI.Tests.Tests
         }
 
         [Fact]
-        public async Task UpdateStudent_InvalidId_ReturnsNotFound()
+        public async Task UpdateStudent_InvalidId_ReturnsForbidden()
         {
             // Arrange: Prepare an update DTO
             var updateDto = new UpdateStudentDTO
@@ -271,8 +271,8 @@ namespace OpenEdAI.Tests.Tests
             // Act: Attempt to update a non-existing student
             var result = await _controller.UpdateStudent("invalid-id", updateDto);
 
-            // Assert: Verify the response is NotFound
-            var notFoundResult = Assert.IsType<NotFoundResult>(result);
+            // Assert: Verify the response is ForbidResult
+            var forbidResult = Assert.IsType<ForbidResult>(result);
         }
 
         // ==================== UPDATE Tests ====================
@@ -317,7 +317,7 @@ namespace OpenEdAI.Tests.Tests
             // Arrange: Get an existing student with created courses
             var student = _context.Students
                 .Include(s => s.CreatorCourses)
-                .FirstOrDefault(s => s.CreatorCourses.Any());
+                .FirstOrDefault(s => s.UserID == "student-003" && s.CreatorCourses.Any());
             Assert.NotNull(student);
 
             var studentId = student.UserID;
@@ -340,13 +340,13 @@ namespace OpenEdAI.Tests.Tests
         }
 
         [Fact]
-        public async Task DeleteStudent_InvalidId_ReturnsNotFound()
+        public async Task DeleteStudent_InvalidId_ReturnsForbidden()
         {
             // Act: Attempt to delete a non-existing student
             var result = await _controller.DeleteStudent("invalid-id");
 
-            // Assert: Verify the response is NotFound
-            var notFoundResult = Assert.IsType<NotFoundResult>(result);
+            // Assert: Verify the response is ForbidResult
+            var forbidResult = Assert.IsType<ForbidResult>(result);
         }
 
         

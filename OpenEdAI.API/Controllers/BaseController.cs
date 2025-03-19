@@ -13,19 +13,24 @@ namespace OpenEdAI.API.Controllers
     {
         protected string GetUserIdFromToken()
         {
+            // The method first checks for an Authorization header, if present and valid, it extracts the token and reads the "sub" claim.
             var authHeader = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
             // If the Authorization header is present and starts with "Bearer", extract the token
-            if (authHeader != null && authHeader.StartsWith("Bearer "))
+            if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
             {
                 var token = authHeader.Substring("Bearer ".Length).Trim();
                 var handler = new JwtSecurityTokenHandler();
                 var jwtToken = handler.ReadToken(token) as JwtSecurityToken;
-
-                // Get the user ID from the token
-                return jwtToken?.Claims.FirstOrDefault(claim => claim.Type == "sub")?.Value;
+                var userId = jwtToken?.Claims.FirstOrDefault(claim => claim.Type == "sub")?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    return userId;
+                }
             }
-            // If the token is missing or invalid, return null
-            return null;
+
+            // Fallback: If no valid token is found in the header (as in tests using HttpContext.User),
+            // fallback to returning the "sub" claim from HttpContext.User directly
+            return HttpContext.User?.FindFirst("sub")?.Value;
         }
 
         protected bool TryValidateUserId(string expectedUserId)

@@ -88,6 +88,12 @@ namespace OpenEdAI.API.Controllers
         [HttpPost]
         public async Task<ActionResult<CourseDTO>> CreateCourse(CreateCourseDTO createDto)
         {
+            // Check for model state errors
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             // Ensure token matches studentId
             if (!TryValidateUserId(createDto.UserID))
             {

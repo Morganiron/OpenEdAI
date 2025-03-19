@@ -80,8 +80,8 @@ namespace OpenEdAI.Tests.Tests
                 Title = "Test Course",
                 Description = "A test description",
                 Tags = new List<string> { "test", "csharp" },
-                UserID = "student-001",
-                UserName = "Student One"
+                UserID = "student-003",
+                UserName = "Student Three"
             };
 
             // Act: Create the course.
@@ -102,8 +102,8 @@ namespace OpenEdAI.Tests.Tests
                 Title = null,
                 Description = "A test description",
                 Tags = new List<string> { "test" },
-                UserID = "student-001",
-                UserName = "Student One"
+                UserID = "student-003", 
+                UserName = "Student Three"
             };
             _controller.ModelState.AddModelError("Title", "Title is required");
 
@@ -288,7 +288,7 @@ namespace OpenEdAI.Tests.Tests
         public async Task EnrollStudent_NonExistentCourse_ReturnsNotFound()
         {
             // Act: Attempt to enroll a student in a non-existent course.
-            var result = await _controller.EnrollStudent(-1, "student-001");
+            var result = await _controller.EnrollStudent(-1, "student-003");
 
             // Assert: Expect a NotFound response.
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
@@ -346,7 +346,7 @@ namespace OpenEdAI.Tests.Tests
         public async Task UnenrollStudent_NonExistentCourse_ReturnsNotFound()
         {
             // Act: Attempt to unenroll a student from a non-existent course.
-            var result = await _controller.UnenrollStudent(-1, "student-001");
+            var result = await _controller.UnenrollStudent(-1, "student-003");
 
             // Assert: Expect a NotFound response.
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
@@ -354,16 +354,15 @@ namespace OpenEdAI.Tests.Tests
         }
 
         [Fact]
-        public async Task UnenrollStudent_NonExistentStudent_ReturnsNotFound()
+        public async Task UnenrollStudent_NonExistentStudent_ReturnsForbidden()
         {
             // Arrange: Choose an existing course and a student ID that does not exist.
             var course = _context.Courses.FirstOrDefault();
             Assert.NotNull(course);
             var result = await _controller.UnenrollStudent(course.CourseID, "non-existent-student");
 
-            // Assert: Expect a NotFound response.
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-            Assert.Equal("Student not found", notFoundResult.Value);
+            // Assert: Expect a ForbidResult response since studentId does not match
+            Assert.IsType<ForbidResult>(result);
         }
 
         // ==================== DELETE Tests ====================

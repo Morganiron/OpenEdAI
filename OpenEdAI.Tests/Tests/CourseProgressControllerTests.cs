@@ -25,7 +25,8 @@ namespace OpenEdAI.Tests.Tests
             _controller = new CourseProgressController(_context);
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext { User = GetMockUser() }
+                // Ensure default user is set to "student-003" which has the most data
+                HttpContext = new DefaultHttpContext { User = GetMockUser("student-003") }
             };
         }
 
@@ -40,6 +41,7 @@ namespace OpenEdAI.Tests.Tests
             // Assert: Ensure the result is OK and that thte list is not empty
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var progressList = Assert.IsAssignableFrom<IEnumerable<CourseProgressDTO>>(okResult.Value);
+
             Assert.NotEmpty(progressList);
         }
 
@@ -80,8 +82,8 @@ namespace OpenEdAI.Tests.Tests
 
             var createDto = new CreateCourseProgressDTO
             {
-                UserID = "student-001",
-                UserName = "Student One",
+                UserID = "student-003",
+                UserName = "Student Three",
                 CourseID = course.CourseID
             };
 
@@ -103,8 +105,8 @@ namespace OpenEdAI.Tests.Tests
             // Arrange: Use an invalid CourseID
             var createDto = new CreateCourseProgressDTO
             {
-                UserID = "student-001",
-                UserName = "Student One",
+                UserID = "student-003",
+                UserName = "Student Three",
                 CourseID = -1
             };
 
@@ -183,7 +185,7 @@ namespace OpenEdAI.Tests.Tests
             var course = _context.Courses.FirstOrDefault();
             Assert.NotNull(course);
 
-            var progress = new CourseProgress("student-001", "Student One", course.CourseID);
+            var progress = new CourseProgress("student-003", "Student Three", course.CourseID);
             _context.CourseProgress.Add(progress);
             await _context.SaveChangesAsync();
             int progressId = progress.ProgressID;

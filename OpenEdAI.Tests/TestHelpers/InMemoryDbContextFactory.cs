@@ -1,8 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Models;
-using OpenEdAI.API.Models;
-
 
 namespace OpenEdAI.Tests.TestHelpers
 {
