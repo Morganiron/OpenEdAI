@@ -202,8 +202,7 @@ namespace OpenEdAI.Tests.Tests
             var newStudent = new StudentDTO
             {
                 UserID = "student-004",
-                Username = "Student Four",
-                Email = "newStudent@example.com"
+                Username = "Student Four"
             };
 
             // Act: Create the student
@@ -227,7 +226,6 @@ namespace OpenEdAI.Tests.Tests
             {
                 UserID = student.UserID,
                 Username = student.UserName,
-                Email = student.Email
             };
 
             // Act: Attempt to create a duplicate student
@@ -249,7 +247,6 @@ namespace OpenEdAI.Tests.Tests
             var updateDto = new UpdateStudentDTO
             {
                 Username = "Updated Student",
-                Email = "updatedStudent@example.com"
             };
 
             // Act: Attempt to update the student
@@ -260,7 +257,6 @@ namespace OpenEdAI.Tests.Tests
             var updatedStudent = await _context.Students.FindAsync(student.UserID);
             Assert.NotNull(updatedStudent);
             Assert.Equal(updateDto.Username, updatedStudent.UserName);
-            Assert.Equal(updateDto.Email, updatedStudent.Email);
         }
 
         [Fact]
@@ -269,8 +265,7 @@ namespace OpenEdAI.Tests.Tests
             // Arrange: Prepare an update DTO
             var updateDto = new UpdateStudentDTO
             {
-                Username = "Updated Student",
-                Email = "updatedStudent@example.com"
+                Username = "Updated Student"
             };
 
             // Act: Attempt to update a non-existing student

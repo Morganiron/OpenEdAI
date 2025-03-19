@@ -35,7 +35,6 @@ namespace OpenEdAI.API.Controllers
                 {
                     UserID = s.UserID,
                     Username = s.UserName,
-                    Email = s.Email,
                     CreatorCourseIds = s.CreatorCourses.Select(c => c.CourseID).ToList(),
                     EnrolledCourseIds = s.EnrolledCourses.Select(c => c.CourseID).ToList(),
                     ProgressRecordIds = s.ProgressRecords.Select(p => p.ProgressID).ToList()
@@ -169,7 +168,7 @@ namespace OpenEdAI.API.Controllers
 
 
             // Create new student object and save to the database
-            var student = new Student(studentDto.UserID, studentDto.Username, studentDto.Email);
+            var student = new Student(studentDto.UserID, studentDto.Username);
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
 
@@ -200,8 +199,7 @@ namespace OpenEdAI.API.Controllers
 
             // Update only the allowed properties
             student.UpdateName(updateDto.Username);
-            student.UpdateEmail(updateDto.Email);
-
+            
             try
             {
                 await _context.SaveChangesAsync();
@@ -250,7 +248,7 @@ namespace OpenEdAI.API.Controllers
             if (dummyUser == null)
             {
                 // Create a dummy user if it doesn't exist
-                dummyUser = new Student(dummyUserId, "Deleted User", "deletedUser@example.com");
+                dummyUser = new Student(dummyUserId, "Deleted User");
                 _context.Students.Add(dummyUser);
                 await _context.SaveChangesAsync();
             }

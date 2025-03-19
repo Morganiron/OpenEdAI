@@ -4,7 +4,6 @@
     {
         public string UserID { get;  set; }
         public string Username { get;  set; }
-        public string Email { get;  set; }
 
         // Only get the IDs for related entities
         public List<int> EnrolledCourseIds { get;  set; }

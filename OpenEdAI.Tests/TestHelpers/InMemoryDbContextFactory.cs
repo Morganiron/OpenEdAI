@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Models;
-using OpenEdAI.Models;
+using OpenEdAI.API.Models;
 
 
 namespace OpenEdAI.Tests.TestHelpers
@@ -37,11 +37,11 @@ namespace OpenEdAI.Tests.TestHelpers
             var students = new List<Student>
             {
                 // Dummy user to inherit courses when a student is deleted from the database
-                new Student("00000000-0000-0000-0000-000000000000", "Deleted User", "deletedUser@example.com"),
+                new Student("00000000-0000-0000-0000-000000000000", "Deleted User"),
                 // Actual test students
-                new Student("student-001", "Student One", "student1@example.com"),
-                new Student("student-002", "Student Two", "johnDoe@example.com"),
-                new Student("student-003", "Student Three", "student3@example.com")
+                new Student("student-001", "Student One"),
+                new Student("student-002", "Student Two"),
+                new Student("student-003", "Student Three")
             };
             context.Students.AddRange(students);
             context.SaveChanges();

@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OpenEdAI\OpenEdAI.API.csproj" />
+    <ProjectReference Include="..\OpenEdAI.API\OpenEdAI.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,9 +5,9 @@ VisualStudioVersion = 17.13.35806.99
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenEdAI.API", "OpenEdAI.API\OpenEdAI.API.csproj", "{BC5B9A44-D1F3-483E-A68E-2D321776ED74}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenEdAI.Tests", "..OpenEdAI.Tests\OpenEdAI.Tests.csproj", "{A0AE75D0-DB89-4B80-93EA-0AD8104C17D1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenEdAI.Client", "OpenEdAI.Client\OpenEdAI.Client.csproj", "{DCC8438E-02BD-FA67-D089-1217EC477A25}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenEdAI.Client", "..OpenEdAI.Client\OpenEdAI.Client.csproj", "{6D437637-D226-4CCE-88CA-75857F34DE60}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenEdAI.Tests", "OpenEdAI.Tests\OpenEdAI.Tests.csproj", "{CFE912F3-AEEB-E6CC-3457-C2308ADE1E69}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,14 +19,14 @@ Global
 		{BC5B9A44-D1F3-483E-A68E-2D321776ED74}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC5B9A44-D1F3-483E-A68E-2D321776ED74}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BC5B9A44-D1F3-483E-A68E-2D321776ED74}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A0AE75D0-DB89-4B80-93EA-0AD8104C17D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A0AE75D0-DB89-4B80-93EA-0AD8104C17D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A0AE75D0-DB89-4B80-93EA-0AD8104C17D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A0AE75D0-DB89-4B80-93EA-0AD8104C17D1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6D437637-D226-4CCE-88CA-75857F34DE60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6D437637-D226-4CCE-88CA-75857F34DE60}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6D437637-D226-4CCE-88CA-75857F34DE60}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6D437637-D226-4CCE-88CA-75857F34DE60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCC8438E-02BD-FA67-D089-1217EC477A25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCC8438E-02BD-FA67-D089-1217EC477A25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCC8438E-02BD-FA67-D089-1217EC477A25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCC8438E-02BD-FA67-D089-1217EC477A25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFE912F3-AEEB-E6CC-3457-C2308ADE1E69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFE912F3-AEEB-E6CC-3457-C2308ADE1E69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFE912F3-AEEB-E6CC-3457-C2308ADE1E69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFE912F3-AEEB-E6CC-3457-C2308ADE1E69}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
