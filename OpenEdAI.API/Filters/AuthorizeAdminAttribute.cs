@@ -9,7 +9,7 @@ namespace OpenEdAI.API.Filters
     /// </summary>
     public class AuthorizeAdminAttribute : Attribute, IAuthorizationFilter
     {
-        
+
         public void OnAuthorization(AuthorizationFilterContext context)
         {
             // Get the Authorization header from the request
@@ -21,23 +21,23 @@ namespace OpenEdAI.API.Filters
                 context.Result = new UnauthorizedResult();
                 return;
             }
-            
+
             // Extract the token from the header
             var token = authHeader.Substring("Bearer ".Length).Trim();
-            
+
             // Create a handler to read the token
             var handler = new JwtSecurityTokenHandler();
-            
+
             // Read the token
             var jwtToken = handler.ReadToken(token) as JwtSecurityToken;
-            
+
             // If the token is null, return Unauthorized
             if (jwtToken == null)
             {
                 context.Result = new UnauthorizedResult();
                 return;
             }
-            
+
             // Get the roles from the token
             var roles = jwtToken.Claims
                 .Where(claim => claim.Type == "cognito:groups")

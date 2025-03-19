@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OpenEdAI.API.Filters;
 using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -17,8 +19,6 @@ namespace OpenEdAI.API.Controllers
         {
             _context = context;
         }
-
-        
 
         // GET: api/Courses
         [HttpGet]
@@ -88,10 +88,10 @@ namespace OpenEdAI.API.Controllers
         [HttpPost]
         public async Task<ActionResult<CourseDTO>> CreateCourse(CreateCourseDTO createDto)
         {
-            // Check if the incoming DTO is valid based on the [Required] attributes
-            if (!ModelState.IsValid)
+            // Ensure token matches studentId
+            if (!TryValidateUserId(createDto.UserID))
             {
-                return BadRequest(ModelState);
+                return Forbid("Student ID does not match the token.");
             }
 
             // Create a new Course instance using the provided data
@@ -136,6 +136,12 @@ namespace OpenEdAI.API.Controllers
         [HttpPost("{courseId}/EnrollStudent/{studentId}")]
         public async Task<IActionResult> EnrollStudent(int courseId, string studentId)
         {
+            // Ensure token matches studentId
+            if (!TryValidateUserId(studentId))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
             var course = await _context.Courses.FindAsync(courseId);
             var student = await _context.Students.FindAsync(studentId);
 
@@ -165,6 +171,12 @@ namespace OpenEdAI.API.Controllers
             if (course == null)
             {
                 return NotFound();
+            }
+
+            // Only the course creator can update the course
+           if (!TryValidateUserId(course.UserID))
+            {
+                return Forbid("Student ID does not match the token.");
             }
 
             if (string.IsNullOrEmpty(updateDto.Title))
@@ -199,6 +211,7 @@ namespace OpenEdAI.API.Controllers
         }
 
         // DELETE: api/Courses
+        [AuthorizeAdmin]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCourse(int id)
         {
@@ -215,6 +228,12 @@ namespace OpenEdAI.API.Controllers
         [HttpDelete("{courseId}/UnenrollStudent/{studentId}")]
         public async Task<IActionResult> UnenrollStudent(int courseId, string studentId)
         {
+            // Ensure that the authenticated user is the one being unenrolled
+            if (!TryValidateUserId(studentId))
+            {
+                return Forbid("You can only unenroll yourself.");
+            }
+
             // Retrieve the course including it's EnrolledStudents collection
             var course = await _context.Courses
                 .Include(c => c.EnrolledStudents)

@@ -185,6 +185,12 @@ namespace OpenEdAI.API.Controllers
         [HttpPut("{userId}")]
         public async Task<IActionResult> UpdateStudent(string userId, UpdateStudentDTO updateDto)
         {
+            // Ensure the user can only update their profile
+            if (!TryValidateUserId(userId))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
             // Retrieve the student from the database
             var student = await _context.Students.FindAsync(userId);
             if (student == null)
@@ -220,6 +226,12 @@ namespace OpenEdAI.API.Controllers
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteStudent(string userId)
         {
+            // Ensure the user can only delete their profile
+            if (!TryValidateUserId(userId))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
             var student = await _context.Students
                 .Include(s => s.CreatorCourses)
                     .ThenInclude(c => c.EnrolledStudents)

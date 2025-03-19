@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -70,6 +71,12 @@ namespace OpenEdAI.API.Controllers
         [HttpPost]
         public async Task<ActionResult<CourseProgressDTO>> CreateProgress(CreateCourseProgressDTO createDto)
         {
+            // Validate only the owner can create progress
+            if (!TryValidateUserId(createDto.UserID))
+            {
+                return Forbid("You can only create progress for your own account.");
+            }
+
             // Validate the referenced course exists
             var course = await _context.Courses.FindAsync(createDto.CourseID);
             if (course == null)
@@ -99,6 +106,8 @@ namespace OpenEdAI.API.Controllers
         [HttpPatch("{progressId}")]
         public async Task<IActionResult> PatchProgress(int progressId, [FromBody] MarkLessonCompleteDTO patchDto)
         {
+            
+            // Get the progress with course and lessons
             var progress = await _context.CourseProgress
                 .Include(cp => cp.Course)
                 .ThenInclude(c => c.Lessons)
@@ -106,6 +115,12 @@ namespace OpenEdAI.API.Controllers
 
             if (progress == null)
                 return NotFound();
+
+            // Validate only the owner can update progress
+            if (!TryValidateUserId(progress.UserID))
+            {
+                return Forbid("UserId does not match token.");
+            }
 
             // Ensure the lesson is part of the course
             if (!progress.Course.Lessons.Any(l => l.LessonID == patchDto.LessonID))
@@ -128,6 +143,12 @@ namespace OpenEdAI.API.Controllers
         {
             var progress = await _context.CourseProgress.FindAsync(progressId);
             if (progress == null) return NotFound();
+
+            // Validate only the owner can delete progress
+            if (!TryValidateUserId(progress.UserID))
+            {
+                return Forbid("UserId does not match token.");
+            }
 
             _context.CourseProgress.Remove(progress);
             await _context.SaveChangesAsync();

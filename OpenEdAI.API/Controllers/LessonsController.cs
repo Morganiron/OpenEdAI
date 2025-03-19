@@ -100,6 +100,12 @@ namespace OpenEdAI.API.Controllers
             if (course == null)
                 return BadRequest("Course not found");
 
+            // Enforce the authenticated user is the owner/creator of the course
+            if (!TryValidateUserId(course.UserID))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
             // Create a new Lesson entity using the provided data
             var lesson = new Lesson(createDto.Title, createDto.Description, createDto.ContentLink, createDto.Tags, createDto.CourseID);
             
@@ -130,9 +136,25 @@ namespace OpenEdAI.API.Controllers
             if (lesson == null)
                 return NotFound();
 
+            // Retrieve the course to verify ownership
+            var course = await _context.Courses.FindAsync(lesson.CourseID);
+            if (course == null)
+            {
+                return BadRequest("Course not found for the lesson.");
+            }
+
+            // Validate the user is the course owner for updates
+            if (!TryValidateUserId(course.UserID))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
+            // TODO: If a course is shared (other users are enrolled)
+            // contentlink updates should create a new course instead
+            // I need to add something for if a link is reported as inappropriate or invalid
+
             // Update only allowed properties
             lesson.UpdateLesson(updateDto.Title, updateDto.Description, updateDto.Tags, updateDto.ContentLink);
-
 
             try
             {
@@ -156,6 +178,23 @@ namespace OpenEdAI.API.Controllers
             var lesson = await _context.Lessons.FindAsync(lessonId);
             if (lesson == null)
                 return NotFound();
+
+            // Retrieve the course to verify ownership
+            var course = await _context.Courses.FindAsync(lesson.CourseID);
+            if (course == null)
+            {
+                return BadRequest("Course not found for the lesson.");
+            }
+
+            // Validate the user is the course owner
+            if (!TryValidateUserId(course.UserID))
+            {
+                return Forbid("Student ID does not match the token.");
+            }
+
+            // TODO: If a course is shared (other users are enrolled)
+            // deleting a lesson should create a new course instead
+            // I need to add something for if a lesson is reported as inappropriate or invalid
 
             _context.Lessons.Remove(lesson);
             await _context.SaveChangesAsync();

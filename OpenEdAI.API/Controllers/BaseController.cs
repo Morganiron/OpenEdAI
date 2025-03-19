@@ -1,7 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OpenEdAI.API.Filters;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -10,7 +9,6 @@ namespace OpenEdAI.API.Controllers
     /// </summary>
     [ApiController]
     [Authorize]
-    [AuthorizeAdmin]
     public class BaseController : ControllerBase
     {
         protected string GetUserIdFromToken()
@@ -29,6 +27,17 @@ namespace OpenEdAI.API.Controllers
             // If the token is missing or invalid, return null
             return null;
         }
+
+        protected bool TryValidateUserId(string expectedUserId)
+        {
+            var tokenUserId = GetUserIdFromToken();
+            if (string.IsNullOrEmpty(tokenUserId))
+            {
+                return false; // Token missing or invalid
+            }
+            return tokenUserId == expectedUserId; // Ensure the token calling the api is the same as the userId passed
+        }
+
         // Check if the user is an admin
         protected bool IsAdmin()
         {
