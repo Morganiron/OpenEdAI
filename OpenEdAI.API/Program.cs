@@ -18,7 +18,13 @@ builder.Configuration
     .AddUserSecrets<Program>();
 
 // Get the connection string for the database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("Database connection string is missing. Please set 'ConnectionStrings__DefaultConnection' in environment variables.");
+}
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -29,9 +35,15 @@ JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 // Configure AWS options
 builder.Services.Configure<AWSOptions>(builder.Configuration.GetSection("AWS"));
-var awsRegion = builder.Configuration.GetValue<string>("AWS:Region");
-var userPoolId = builder.Configuration.GetValue<string>("AWS:UserPoolId");
-var appClientId = builder.Configuration.GetValue<string>("AWS:AppClientId");
+var userPoolId = Environment.GetEnvironmentVariable("AWS__UserPoolId")
+                 ?? builder.Configuration.GetValue<string>("AWS:UserPoolId");
+
+var appClientId = Environment.GetEnvironmentVariable("AWS__AppClientId")
+                  ?? builder.Configuration.GetValue<string>("AWS:AppClientId");
+
+var awsRegion = Environment.GetEnvironmentVariable("AWS__Region")
+                ?? builder.Configuration.GetValue<string>("AWS:Region");
+
 
 if (string.IsNullOrEmpty(userPoolId) || string.IsNullOrEmpty(appClientId))
 {
@@ -149,12 +161,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+    //app.UseHttpsRedirection();
 
-// Enable authentication & authorization middleware
-app.UseAuthentication();
+    // Enable authentication & authorization middleware
+    app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Allow the app to listen on all network interfaces, but only when running in a container
+if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
+{
+    app.Urls.Add("http://+:80");
+}
 
 app.Run();
