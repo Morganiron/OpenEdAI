@@ -74,7 +74,7 @@ namespace OpenEdAI.API.Controllers
             // Validate only the owner can create progress
             if (!TryValidateUserId(createDto.UserID))
             {
-                return Forbid("You can only create progress for your own account.");
+                return Forbid();
             }
 
             // Validate the referenced course exists
@@ -119,7 +119,7 @@ namespace OpenEdAI.API.Controllers
             // Validate only the owner can update progress
             if (!TryValidateUserId(progress.UserID))
             {
-                return Forbid("UserId does not match token.");
+                return Forbid();
             }
 
             // Ensure the lesson is part of the course
@@ -147,7 +147,7 @@ namespace OpenEdAI.API.Controllers
             // Validate only the owner can delete progress
             if (!TryValidateUserId(progress.UserID))
             {
-                return Forbid("UserId does not match token.");
+                return Forbid();
             }
 
             _context.CourseProgress.Remove(progress);

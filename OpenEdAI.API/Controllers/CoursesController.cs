@@ -97,7 +97,7 @@ namespace OpenEdAI.API.Controllers
             // Ensure token matches studentId
             if (!TryValidateUserId(createDto.UserID))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             // Create a new Course instance using the provided data
@@ -145,7 +145,7 @@ namespace OpenEdAI.API.Controllers
             // Ensure token matches studentId
             if (!TryValidateUserId(studentId))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             var course = await _context.Courses.FindAsync(courseId);
@@ -182,7 +182,7 @@ namespace OpenEdAI.API.Controllers
             // Only the course creator can update the course
            if (!TryValidateUserId(course.UserID))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             if (string.IsNullOrEmpty(updateDto.Title))
@@ -237,7 +237,7 @@ namespace OpenEdAI.API.Controllers
             // Ensure that the authenticated user is the one being unenrolled
             if (!TryValidateUserId(studentId))
             {
-                return Forbid("You can only unenroll yourself.");
+                return Forbid();
             }
 
             // Retrieve the course including it's EnrolledStudents collection

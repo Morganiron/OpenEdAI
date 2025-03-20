@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Filters;
 using OpenEdAI.API.Models;
 
 namespace OpenEdAI.API.Controllers
@@ -158,24 +159,34 @@ namespace OpenEdAI.API.Controllers
 
         // POST: api/Students
         [HttpPost]
-        public async Task<ActionResult<StudentDTO>> CreateStudent(StudentDTO studentDto)
+        public async Task<ActionResult<StudentDTO>> CreateStudent()
         {
-            // The front-end will populate studentDto with the correct values
-            
-            var existingStudent = await _context.Students.FindAsync(studentDto.UserID);
+            // Extract user information from the token
+            var userIdClaim = User.FindFirst("sub")?.Value; // Cognito 'sub' (UUID)
+            var usernameClaim = User.FindFirst("username")?.Value; // Cognito 'username'
+
+            if (string.IsNullOrEmpty(userIdClaim) || string.IsNullOrEmpty(usernameClaim))
+            {
+                return Unauthorized("Invalid token. User ID or username not found.");
+            }
+
+            // Check if the student already exsists
+            var existingStudent = await _context.Students.FindAsync(userIdClaim);
             if (existingStudent != null)
                 return Conflict("Student already exists");
 
 
             // Create new student object and save to the database
-            var student = new Student(studentDto.UserID, studentDto.Username);
+            var student = new Student(userIdClaim, usernameClaim);
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
 
             // Prepare and return the DTO
-            studentDto.CreatorCourseIds = student.CreatorCourses.Select(c => c.CourseID).ToList();
-            studentDto.EnrolledCourseIds = student.EnrolledCourses.Select(c => c.CourseID).ToList();
-            studentDto.ProgressRecordIds = student.ProgressRecords.Select(p => p.ProgressID).ToList();
+            var studentDto = new StudentDTO
+            {
+                UserID = student.UserID,
+                Username = student.UserName
+            };            
 
             return CreatedAtAction(nameof(GetStudent), new { userid = student.UserID }, studentDto);
         }
@@ -187,7 +198,7 @@ namespace OpenEdAI.API.Controllers
             // Ensure the user can only update their profile
             if (!TryValidateUserId(userId))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             // Retrieve the student from the database
@@ -224,10 +235,11 @@ namespace OpenEdAI.API.Controllers
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteStudent(string userId)
         {
-            // Ensure the user can only delete their profile
-            if (!TryValidateUserId(userId))
+            // If the user is not an admin, ensure they can only delete their own profile
+            var tokenUserId = User.FindFirst("sub")?.Value; // Cognito 'sub' (UUID)
+            if (!IsAdmin() && tokenUserId != userId)
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid(); // Prevent non-admin users from deleting other users
             }
 
             var student = await _context.Students

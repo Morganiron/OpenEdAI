@@ -103,7 +103,7 @@ namespace OpenEdAI.API.Controllers
             // Enforce the authenticated user is the owner/creator of the course
             if (!TryValidateUserId(course.UserID))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             // Create a new Lesson entity using the provided data
@@ -146,7 +146,7 @@ namespace OpenEdAI.API.Controllers
             // Validate the user is the course owner for updates
             if (!TryValidateUserId(course.UserID))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             // TODO: If a course is shared (other users are enrolled)
@@ -189,7 +189,7 @@ namespace OpenEdAI.API.Controllers
             // Validate the user is the course owner
             if (!TryValidateUserId(course.UserID))
             {
-                return Forbid("Student ID does not match the token.");
+                return Forbid();
             }
 
             // TODO: If a course is shared (other users are enrolled)
