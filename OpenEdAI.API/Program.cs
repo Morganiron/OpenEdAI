@@ -27,6 +27,17 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     });
 });
 
+// Add CORS service 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontendDev", policy =>
+    {
+        policy.WithOrigins("http://localhost:5239") // frontend dev port
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
+});
+
 // Get the connection string for the database
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                     ?? builder.Configuration.GetConnectionString("DefaultConnection");
@@ -171,10 +182,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-    app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 
-    // Enable authentication & authorization middleware
-    app.UseAuthentication();
+// Enable authentication & authorization middleware
+app.UseCors("AllowFrontendDev");
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
