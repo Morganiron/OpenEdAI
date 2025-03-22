@@ -17,6 +17,16 @@ builder.Configuration
     // Load user secrets only in development
     .AddUserSecrets<Program>();
 
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(80); //HTTP
+
+    serverOptions.ListenAnyIP(443, listenOptions =>
+    {
+        listenOptions.UseHttps("/https/aspnetapp.pfx", "devcertpass");
+    });
+});
+
 // Get the connection string for the database
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                     ?? builder.Configuration.GetConnectionString("DefaultConnection");
@@ -161,18 +171,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-    //app.UseHttpsRedirection();
+    app.UseHttpsRedirection();
 
     // Enable authentication & authorization middleware
     app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Allow the app to listen on all network interfaces, but only when running in a container
-if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
-{
-    app.Urls.Add("http://+:80");
-}
 
 app.Run();
