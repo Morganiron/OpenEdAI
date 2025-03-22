@@ -198,38 +198,28 @@ namespace OpenEdAI.Tests.Tests
         [Fact]
         public async Task CreateStudent_ValidData_ReturnsCreatedStudent()
         {
-            // Arrange: Create a new student DTO
-            var newStudent = new StudentDTO
-            {
-                UserID = "student-004",
-                Username = "Student Four"
-            };
+            // Arrange: Setup mock user that does not exist in DB
+            _controller.ControllerContext.HttpContext.User = GetMockUser("student-004", "Student Four");
 
             // Act: Create the student
-            var result = await _controller.CreateStudent(newStudent);
+            var result = await _controller.CreateStudent();
 
             // Assert: Verify the response is Created and the student is returned
             var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
             var studentDto = Assert.IsType<StudentDTO>(createdResult.Value);
-            Assert.Equal(newStudent.UserID, studentDto.UserID);
+            Assert.Equal("student-004", studentDto.UserID);
+            Assert.Equal("Student Four", studentDto.Username);
         }
 
         [Fact]
         public async Task CreateStudent_ExistingStudent_ReturnsConflict()
         {
-            // Arrange: retrieve an existing student
-            var student = _context.Students.FirstOrDefault();
-            Assert.NotNull(student);
+            // Arrange: Get the mock user id that already exists (student-003)
+            _controller.ControllerContext.HttpContext.User = GetMockUser();
 
-            // Create a new student DTO with the same ID
-            var createDto = new StudentDTO
-            {
-                UserID = student.UserID,
-                Username = student.UserName,
-            };
-
+            
             // Act: Attempt to create a duplicate student
-            var result = await _controller.CreateStudent(createDto);
+            var result = await _controller.CreateStudent();
 
             // Assert: Verify the response is Conflict
             var conflictResult = Assert.IsType<ConflictObjectResult>(result.Result);

@@ -17,12 +17,13 @@ namespace OpenEdAI.Tests.TestHelpers
             _context = InMemoryDbContextFactory.Create();
         }
 
-        protected ClaimsPrincipal GetMockUser(string userId = "student-003")
+        protected ClaimsPrincipal GetMockUser(string userId = "student-003", string username = "Student Three")
         {
             // Regular student user
             var identity = new ClaimsIdentity(new[]
             {
-                new Claim("sub", userId)
+                new Claim("sub", userId),
+                new Claim("username", username)
             }, "mock");
 
             return new ClaimsPrincipal(identity);
