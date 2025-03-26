@@ -1,0 +1,95 @@
+﻿@using System.Text.Json.Serialization
+@using System.Text.Json
+@page "/auth-callback"
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Signing you in...</h3>
+
+@code {
+	protected override async Task OnInitializedAsync()
+	{
+		var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+		var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+		var code = query.Get("code");
+
+		if (string.IsNullOrEmpty(code))
+		{
+			Console.WriteLine("No authorization code found in URL.");
+			Navigation.NavigateTo("/", forceLoad: false);
+			return;
+		}
+
+		try
+		{
+			Console.WriteLine($"Sending code to backend for exchange: {code}");
+
+			var payload = new AuthCodeExchangeRequest { Code = code };
+			var response = await Http.PostAsJsonAsync("auth/exchange", payload);
+
+			if (response.IsSuccessStatusCode)
+			{
+				// Read the raw JSON response for debugging
+				var tokenJson = await response.Content.ReadAsStringAsync();
+				Console.WriteLine("Received token response: " + tokenJson);
+
+				// Deserialize using case-insensitive property names
+				var token = JsonSerializer.Deserialize<AuthTokenResponse>(
+					tokenJson,
+					new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+				);
+
+				if (token != null)
+				{
+					Console.WriteLine("Parsed AccessToken: " + token.AccessToken);
+					Console.WriteLine("Parsed IdToken: " + token.IdToken); 
+
+					await JS.InvokeVoidAsync("localStorage.setItem", "access_token", token.AccessToken);
+					await JS.InvokeVoidAsync("localStorage.setItem", "id_token", token.IdToken);
+					Console.WriteLine("Tokens stored in localStorage.");
+
+					// Debug: Read them back and log
+					var storedAccessToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
+					var storedIdToken = await JS.InvokeAsync<string>("localStorage.getItem", "id_token");
+					Console.WriteLine($"[AuthCallback] Stored access_token: {storedAccessToken}");
+					Console.WriteLine($"[AuthCallback] Stored id_token: {storedIdToken}");
+				}
+				else
+				{
+					Console.WriteLine("Received null token object.");
+				}
+
+				// Wait for a second before redirecting to give the JS time to store the tokens
+				await Task.Delay(1000);
+
+				Navigation.NavigateTo("/", forceLoad: true);
+			}
+			else
+			{
+				Console.WriteLine($"Token exchange failed. Status: {response.StatusCode}");
+				Navigation.NavigateTo("/", forceLoad: false);
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Exception during token exchange: {ex.Message}");
+			Navigation.NavigateTo("/", forceLoad: false);
+		}
+	}
+
+	public class AuthCodeExchangeRequest
+	{
+		public string Code { get; set; }
+	}
+
+	public class AuthTokenResponse
+	{
+		[JsonPropertyName("accessToken")]
+		public string AccessToken { get; set; }
+
+		[JsonPropertyName("idToken")]
+		public string IdToken { get; set; }
+	}
+}

@@ -1,12 +1,48 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Sorry, there's nothing at this address.</p>
-        </LayoutView>
-    </NotFound>
-</Router>
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject OpenEdAI.Client.Models.AuthConfig Auth
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+<!-- Redirect to Cogntio login if there is not a valid token in localStorage -->
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // If the page is AuthCallback, do not perform the token check.
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (uri.AbsolutePath.Equals("/auth-callback", StringComparison.OrdinalIgnoreCase))
+        {
+            // The auth callback is being processed, do not redirect
+            return;
+        }
+		// Otherwise, check for the token in localStorage
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
+
+        Console.WriteLine($"LocalStorage token: {token}");
+
+        if (string.IsNullOrWhiteSpace(token) || token.Trim().ToLower() == "null")
+        {
+            Console.WriteLine("No token found in localStorage. Redirecting to login.");
+            // Immediately redirect to the congnito login
+            Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+        }
+        else
+        {
+            Console.WriteLine("Access token found, continuing...");
+        }
+    }
+
+}
