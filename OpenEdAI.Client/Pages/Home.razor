@@ -1,7 +1,36 @@
 ﻿@page "/"
+@using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Components
+@inject Services.CourseService CourseService
 
-<PageTitle>Home</PageTitle>
+<h2>Your Enrolled Courses</h2>
 
-<h1>Hello, world!</h1>
+@if (CourseService == null)
+{
+	<p>Loading...</p>
+}
+@if (courses == null){
+	<p>Loading...</p>
+}
+else if (!courses.Any())
+{
+	<p>You are not enrolled in any courses.</p>
+}
+else
+{
+	<div class="course-list">
+		@foreach (var course in courses)
+		{
+			<CourseCard Course="course" />
+		}
+	</div>
+}
 
-Welcome to your new app.
+@code {
+	private List<CourseDTO> courses;
+
+	protected override async Task OnInitializedAsync()
+	{
+		courses = await CourseService.GetEnrolledCoursesAsync();
+	}
+}

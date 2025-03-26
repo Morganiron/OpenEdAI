@@ -1,0 +1,13 @@
+﻿@using OpenEdAI.Client.Models
+
+<div class="course-card">
+	<h3>@Course.Title</h3>
+	<p>@Course.Description</p>
+	<p><strong>Tags:</strong> @string.Join(", ", Course.Tags ?? new())</p>
+	<p><em>Created by: @Course.UserName</em></p>
+	<p><small>Updated: @Course.UpdateDate.ToShortDateString()</small></p>
+</div>
+
+@code {
+	[Parameter] public CourseDTO Course { get; set; }
+}
