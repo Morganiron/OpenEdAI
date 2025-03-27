@@ -1,9 +1,11 @@
 ﻿@using System.Text.Json.Serialization
 @using System.Text.Json
+@using OpenEdAI.Client.Models
 @page "/auth-callback"
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject Services.TokenManager TokenManager
 
 <h3>Signing you in...</h3>
 
@@ -44,27 +46,41 @@
 				if (token != null)
 				{
 					Console.WriteLine("Parsed AccessToken: " + token.AccessToken);
-					Console.WriteLine("Parsed IdToken: " + token.IdToken); 
+					Console.WriteLine("Parsed RefreshToken: " + token.RefreshToken);
 
-					await JS.InvokeVoidAsync("localStorage.setItem", "access_token", token.AccessToken);
-					await JS.InvokeVoidAsync("localStorage.setItem", "id_token", token.IdToken);
-					Console.WriteLine("Tokens stored in localStorage.");
+					// Clear any old tokens before storing the new ones
+					Console.WriteLine("Clearing old tokens...");
+					await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
+					await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
+
+					// Store the access token using the TokenManager
+					await TokenManager.SetTokenAsync(token.AccessToken);
+
+					// Store the refresh token separately
+					if (!string.IsNullOrWhiteSpace(token.RefreshToken))
+					{
+						await JS.InvokeVoidAsync("localStorage.setItem", "refresh_token", token.RefreshToken);
+					}
+
+					Console.WriteLine("Tokens stored successfully.");
 
 					// Debug: Read them back and log
 					var storedAccessToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
-					var storedIdToken = await JS.InvokeAsync<string>("localStorage.getItem", "id_token");
+					var storedRefreshToken = await JS.InvokeAsync<string>("localStorage.getItem", "refresh_token");
+
 					Console.WriteLine($"[AuthCallback] Stored access_token: {storedAccessToken}");
-					Console.WriteLine($"[AuthCallback] Stored id_token: {storedIdToken}");
+					Console.WriteLine($"[AuthCallback] Stored refresh_token: {storedRefreshToken}");
+
+					// Wait for a second before redirecting to give the JS time to store the tokens
+					await Task.Delay(1000);
+					Navigation.NavigateTo("/", forceLoad: true);
 				}
 				else
 				{
 					Console.WriteLine("Received null token object.");
+					Navigation.NavigateTo("/", forceLoad: false);
 				}
 
-				// Wait for a second before redirecting to give the JS time to store the tokens
-				await Task.Delay(1000);
-
-				Navigation.NavigateTo("/", forceLoad: true);
 			}
 			else
 			{
@@ -82,14 +98,5 @@
 	public class AuthCodeExchangeRequest
 	{
 		public string Code { get; set; }
-	}
-
-	public class AuthTokenResponse
-	{
-		[JsonPropertyName("accessToken")]
-		public string AccessToken { get; set; }
-
-		[JsonPropertyName("idToken")]
-		public string IdToken { get; set; }
 	}
 }
