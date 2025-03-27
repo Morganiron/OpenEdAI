@@ -1,15 +1,25 @@
-﻿@inherits LayoutComponentBase
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject OpenEdAI.Client.Models.AuthConfig Auth
+@inject AuthenticationStateProvider AuthStateProvider
 
 <!-- Navbar -->
 <nav class="navbar">
 	<div class="nav-left">
-		<a href="/">Home</a>
+		<a href="/dashboard">Dashboard</a>
 	</div>
 	<div class="nav-right">
-		<a href="#" @onclick="Logout">Logout</a>
+		@if (isAuthenticated)
+		{
+			<a href="#" @onclick="Logout">Logout</a>
+		}
+		else if (onLandingPage)
+		{
+			<a href="#" @onclick="Login">Sign In / Sign Up</a>
+		}
+
 	</div>
 </nav>
 
@@ -17,6 +27,34 @@
 
 
 @code {
+	private bool isAuthenticated = false;
+	private bool onLandingPage = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await SetAuthAndRouteState();
+
+		// Subscribe to authentication state changes (login/logout)
+		AuthStateProvider.AuthenticationStateChanged += async (_) =>
+		{
+			await SetAuthAndRouteState();
+			StateHasChanged(); // Trigger UI refresh
+		};
+
+	}
+
+	private async Task SetAuthAndRouteState()
+	{
+		var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+		// Check if the user is authenticated
+		isAuthenticated = authState.User.Identity.IsAuthenticated;
+
+
+		// Check if the user is on the landing page
+		var uri = Navigation.ToBaseRelativePath(Navigation.Uri);
+		onLandingPage = string.IsNullOrWhiteSpace(uri);
+	}
+
 	private async Task Logout()
 	{
 		Console.WriteLine("Logging out: Clearing stored tokens.");
@@ -26,6 +64,11 @@
 
 		// Redirect to the Cognito logout URL
 		Console.WriteLine("Redirecting to Cognito logout...");
-		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: true);
+		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: false);
+	}
+
+	private void Login()
+	{
+		Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: false);
 	}
 }

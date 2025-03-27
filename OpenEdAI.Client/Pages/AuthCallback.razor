@@ -72,8 +72,8 @@
 					Console.WriteLine($"[AuthCallback] Stored refresh_token: {storedRefreshToken}");
 
 					// Wait for a second before redirecting to give the JS time to store the tokens
-					await Task.Delay(1000);
-					Navigation.NavigateTo("/", forceLoad: true);
+					await Task.Delay(200);
+					Navigation.NavigateTo("/dashboard");
 				}
 				else
 				{

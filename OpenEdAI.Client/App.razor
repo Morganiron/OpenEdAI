@@ -6,7 +6,23 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @{
+                        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+						// Set public urls that do not require authentication
+						var publicRoutes = new[] { "", "auth-callback" };
+                        // Redirect to login for non-public routes
+                        if (!publicRoutes.Contains(path.ToLowerInvariant()))
+                        {
+                            // Redirect to the landing page if not authorized
+                            Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+                        }
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+
         </Found>
         <NotFound>
             <PageTitle>Not found</PageTitle>
@@ -21,11 +37,11 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        // If the page is AuthCallback, do not perform the token check.
-        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
-        if (uri.AbsolutePath.Equals("/auth-callback", StringComparison.OrdinalIgnoreCase))
+		var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+		// Allow /auth-callback and /landing pages to load without a token
+        if (relativePath == "" || relativePath.StartsWith("auth-callback", StringComparison.OrdinalIgnoreCase))
         {
-            // The auth callback is being processed, do not redirect
             return;
         }
 		// Otherwise, check for the token in localStorage

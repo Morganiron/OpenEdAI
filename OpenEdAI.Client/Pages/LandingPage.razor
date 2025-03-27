@@ -1,0 +1,37 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject OpenEdAI.Client.Models.AuthConfig Auth
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h1>Welcome to OpenEd AI</h1>
+<p>Personalized, AI-powered learning from free online resources.</p>
+@if (isAuthenticated)
+{
+	<button @onclick="GoToDashboard">Go to Dashboard</button>
+}
+else
+{
+	<button @onclick="Login">Login/Sign Up</button>
+}
+
+
+@code {
+	private bool isAuthenticated;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+		isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+	}
+
+	private void GoToDashboard()
+	{
+		Navigation.NavigateTo("/dashboard", forceLoad: true);
+	}
+
+	private void Login()
+	{
+		Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+	}
+}

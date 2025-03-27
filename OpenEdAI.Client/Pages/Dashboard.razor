@@ -1,4 +1,6 @@
-﻿@page "/"
+﻿@page "/dashboard"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using OpenEdAI.Client.Models
 @using OpenEdAI.Client.Components
 @inject Services.CourseService CourseService
