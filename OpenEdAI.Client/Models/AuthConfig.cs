@@ -15,5 +15,10 @@
             $"response_type={ResponseType}&" +
             $"scope={Scope}&" +
             $"redirect_uri={Uri.EscapeDataString(RedirectUri)}";
+
+        public string CognitoLogoutUrl =>
+            $"{CognitoDomain}/logout?" +
+            $"client_id={AppClientId}&" +
+            $"logout_uri={Uri.EscapeDataString(PostLogoutRedirectUri)}";
     }
 }

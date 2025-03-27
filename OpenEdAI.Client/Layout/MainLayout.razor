@@ -1,8 +1,31 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject OpenEdAI.Client.Models.AuthConfig Auth
 
 <!-- Navbar -->
 <nav class="navbar">
-	<a href="/">Home</a>
+	<div class="nav-left">
+		<a href="/">Home</a>
+	</div>
+	<div class="nav-right">
+		<a href="#" @onclick="Logout">Logout</a>
+	</div>
 </nav>
 
 @Body
+
+
+@code {
+	private async Task Logout()
+	{
+		Console.WriteLine("Logging out: Clearing stored tokens.");
+		// Clear the tokens from localStorage
+		await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
+		await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
+
+		// Redirect to the Cognito logout URL
+		Console.WriteLine("Redirecting to Cognito logout...");
+		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: true);
+	}
+}
