@@ -11,13 +11,18 @@
                     @{
                         var path = Navigation.ToBaseRelativePath(Navigation.Uri);
 
-						// Set public urls that do not require authentication
-						var publicRoutes = new[] { "", "auth-callback" };
+                        // Set public urls that do not require authentication
+                        var publicRoutes = new[] { "", "auth-callback" };
                         // Redirect to login for non-public routes
                         if (!publicRoutes.Contains(path.ToLowerInvariant()))
                         {
-                            // Redirect to the landing page if not authorized
-                            Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+                            // Small delay to allow token updates before redirecting
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(500);
+                                // Redirect to login if not authorized
+                                Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+                            });
                         }
                     }
                 </NotAuthorized>
@@ -37,28 +42,28 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-		var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+		// var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
 
-		// Allow /auth-callback and /landing pages to load without a token
-        if (relativePath == "" || relativePath.StartsWith("auth-callback", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-		// Otherwise, check for the token in localStorage
-        var token = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
+		// // Allow /auth-callback and /landing pages to load without a token
+  //       if (relativePath == "" || relativePath.StartsWith("auth-callback", StringComparison.OrdinalIgnoreCase))
+  //       {
+  //           return;
+  //       }
+		// // Otherwise, check for the token in localStorage
+  //       var token = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
 
-        Console.WriteLine($"LocalStorage token: {token}");
+  //       Console.WriteLine($"LocalStorage token: {token}");
 
-        if (string.IsNullOrWhiteSpace(token) || token.Trim().ToLower() == "null")
-        {
-            Console.WriteLine("No token found in localStorage. Redirecting to login.");
-            // Immediately redirect to the congnito login
-            Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
-        }
-        else
-        {
-            Console.WriteLine("Access token found, continuing...");
-        }
+  //       if (string.IsNullOrWhiteSpace(token) || token.Trim().ToLower() == "null")
+  //       {
+  //           Console.WriteLine("No token found in localStorage. Redirecting to login.");
+  //           // Immediately redirect to the congnito login
+  //           Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+  //       }
+  //       else
+  //       {
+  //           Console.WriteLine("Access token found, continuing...");
+  //       }
     }
 
 }

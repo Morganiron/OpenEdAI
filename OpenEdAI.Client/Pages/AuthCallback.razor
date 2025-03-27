@@ -12,8 +12,28 @@
 <GlobalLoading /> 
 
 @code {
+	private bool _hasExchangedCode = false;
+
 	protected override async Task OnInitializedAsync()
 	{
+		// Check for an existing, valid token
+		var existingToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
+		if (!string.IsNullOrWhiteSpace(existingToken) && existingToken != "null" && TokenManager.IsTokenValid(existingToken))
+		{
+			Console.WriteLine("[AuthCallback] Existing access token found. Redirecting to dashboard.");
+			Navigation.NavigateTo("/dashboard", replace: true);
+			_hasExchangedCode = true;
+			return;
+		}
+
+		// Prevent multiple code exchanges
+		if (_hasExchangedCode)
+		{
+			Console.WriteLine("[AuthCallback] _hasExchangedCode is true. Redirecting to dashboard.");
+			Navigation.NavigateTo("/dashboard", replace: true);
+			return;
+		}
+
 		Loader.Show();
 
 		var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
@@ -21,10 +41,11 @@
 
 		var code = query.Get("code");
 
+		// If there is no code, clear the URL to avoid duplicate exchanges and redirect to the landing page
 		if (string.IsNullOrEmpty(code))
 		{
-			Console.WriteLine("No authorization code found in URL.");
-			Navigation.NavigateTo("/", forceLoad: false);
+			Console.WriteLine("No code found in query string. Redirecting to landing page");
+			Navigation.NavigateTo("/", forceLoad: true);
 			return;
 		}
 
@@ -33,6 +54,9 @@
 			Console.WriteLine($"Sending code to backend for exchange: {code}");
 
 			var payload = new AuthCodeExchangeRequest { Code = code };
+			var payloadJson = JsonSerializer.Serialize(payload);
+			Console.WriteLine($"Payload being sent to /auth/exchange: {payloadJson}"); 
+
 			var response = await Http.PostAsJsonAsync("auth/exchange", payload);
 
 			if (response.IsSuccessStatusCode)
@@ -54,8 +78,7 @@
 
 					// Clear any old tokens before storing the new ones
 					Console.WriteLine("Clearing old tokens...");
-					await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
-					await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
+					await ClearTokensAsync();
 
 					// Store the access token using the TokenManager
 					await TokenManager.SetTokenAsync(token.AccessToken);
@@ -72,12 +95,17 @@
 					var storedAccessToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
 					var storedRefreshToken = await JS.InvokeAsync<string>("localStorage.getItem", "refresh_token");
 
+					_hasExchangedCode = true;
+					Console.WriteLine("[AuthCallback] _hasExchangedCode = true");
+
 					Console.WriteLine($"[AuthCallback] Stored access_token: {storedAccessToken}");
 					Console.WriteLine($"[AuthCallback] Stored refresh_token: {storedRefreshToken}");
 
 					// Wait for a second before redirecting to give the JS time to store the tokens
+					Console.WriteLine("Waiting for 200ms before redirecting...");
 					await Task.Delay(200);
-					Navigation.NavigateTo("/dashboard");
+					Console.WriteLine("Redirecting to dashboard...");
+					Navigation.NavigateTo("/dashboard", replace: true);
 				}
 				else
 				{
@@ -88,7 +116,10 @@
 			}
 			else
 			{
-				Console.WriteLine($"Token exchange failed. Status: {response.StatusCode}");
+				Console.WriteLine($"[AuthCallback] Token exchange failed. Status: {response.StatusCode}");
+				var errorContent = await response.Content.ReadAsStringAsync();
+				Console.WriteLine($"[AuthCallback] Error content: {errorContent}");
+				Console.WriteLine($"[AuthCallback] Redirecting to landing page.");
 				Navigation.NavigateTo("/", forceLoad: false);
 			}
 		}
@@ -101,6 +132,14 @@
 		{
 			Loader.Hide();
 		}
+	}
+
+	// Helper method to clear old tokens from localStorage
+	private async Task ClearTokensAsync()
+	{
+		Console.WriteLine("Clearing old tokens from localStorage...");
+		await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
+		await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
 	}
 
 	public class AuthCodeExchangeRequest

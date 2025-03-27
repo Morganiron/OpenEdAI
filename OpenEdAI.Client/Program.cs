@@ -46,4 +46,9 @@ var authConfig = builder.Configuration.GetSection("AuthConfig").Get<AuthConfig>(
 builder.Services.AddSingleton(authConfig);
 
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// Retrieve the token manager and initialize it
+var tokenManager = host.Services.GetRequiredService<TokenManager>();
+await tokenManager.InitializeAsync();
+await host.RunAsync();

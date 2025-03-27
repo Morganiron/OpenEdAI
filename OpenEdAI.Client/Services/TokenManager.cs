@@ -31,6 +31,42 @@ namespace OpenEdAI.Client.Services
             return await _js.InvokeAsync<string>("localStorage.getItem", "access_token");
         }
 
+        // Check that the token is valid
+        public bool IsTokenValid(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token) || token == "null")
+            {
+                return false;
+            }
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var jwt = handler.ReadJwtToken(token);
+
+                // Check if the token is expired
+                return jwt.ValidTo > DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error validating token: {ex.Message}");
+                return false;
+            }
+        }
+
+        // Initialize the token manager to ensure the token is valid and schedule a refresh
+        public async Task InitializeAsync()
+        {
+            var token = await GetTokenAsync();
+            if (IsTokenValid(token))
+            {
+                ScheduleRefresh(token);
+            }
+            else
+            {
+                await ClearTokensAsync();
+            }
+        }
+
         // Stores the token and schedules a refresh
         public async Task SetTokenAsync(string token)
         {
