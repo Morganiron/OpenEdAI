@@ -8,18 +8,22 @@ namespace OpenEdAI.Client.Services
     {
         private readonly HttpClient _http;
         private readonly AuthenticationStateProvider _authStateProvider;
+        private readonly LoadingService _loader;
 
-        public CourseService(HttpClient http, AuthenticationStateProvider authStateProvider)
+        public CourseService(HttpClient http, AuthenticationStateProvider authStateProvider, LoadingService loader)
         {
             _http = http;
             _authStateProvider = authStateProvider;
-
+            _loader = loader;
         }
 
         public async Task<List<CourseDTO>> GetEnrolledCoursesAsync()
         {
             try
             {
+                // Show the loading spinner
+                _loader.Show();
+
                 // Retrieve the current user's authentication state
                 var authState = await _authStateProvider.GetAuthenticationStateAsync();
                 var user = authState.User;
@@ -47,6 +51,11 @@ namespace OpenEdAI.Client.Services
             {
                 Console.WriteLine($"Unexpected error: {ex.Message}");
                 return new List<CourseDTO>();
+            }
+            finally
+            {
+                // Hide the loading spinner
+                _loader.Hide();
             }
         }
     }

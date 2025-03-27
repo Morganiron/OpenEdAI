@@ -1,17 +1,21 @@
 ﻿@using System.Text.Json.Serialization
 @using System.Text.Json
 @using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Shared
 @page "/auth-callback"
+@inject Services.LoadingService Loader
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject Services.TokenManager TokenManager
 
-<h3>Signing you in...</h3>
+<GlobalLoading /> 
 
 @code {
 	protected override async Task OnInitializedAsync()
 	{
+		Loader.Show();
+
 		var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
 		var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
 
@@ -92,6 +96,10 @@
 		{
 			Console.WriteLine($"Exception during token exchange: {ex.Message}");
 			Navigation.NavigateTo("/", forceLoad: false);
+		}
+		finally
+		{
+			Loader.Hide();
 		}
 	}
 

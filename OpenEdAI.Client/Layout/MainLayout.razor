@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using OpenEdAI.Client.Shared
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -22,6 +23,9 @@
 
 	</div>
 </nav>
+
+<!-- Loading Spinner -->
+<GlobalLoading />
 
 @Body
 

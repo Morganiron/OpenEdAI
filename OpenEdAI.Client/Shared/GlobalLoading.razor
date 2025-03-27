@@ -1,0 +1,25 @@
+﻿@inject OpenEdAI.Client.Services.LoadingService Loader
+
+@if (isLoading)
+{
+	// Show the loading overlay
+    <div class="global-loading-overlay" id="global-loader">
+        <div class="loader-spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+}
+
+@code {
+    private bool isLoading;
+	// Subscribe to loading state changes
+    protected override void OnInitialized()
+    {
+        isLoading = Loader.IsLoading;
+        Loader.OnLoadingChanged += () =>
+        {
+            isLoading = Loader.IsLoading;
+            InvokeAsync(StateHasChanged);
+        };
+    }
+
+}
