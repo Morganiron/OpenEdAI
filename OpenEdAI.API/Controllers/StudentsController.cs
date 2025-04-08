@@ -36,6 +36,7 @@ namespace OpenEdAI.API.Controllers
                 {
                     UserID = s.UserID,
                     Username = s.UserName,
+                    HasCompletedSetup = s.HasCompletedSetup,
                     CreatorCourseIds = s.CreatorCourses.Select(c => c.CourseID).ToList(),
                     EnrolledCourseIds = s.EnrolledCourses.Select(c => c.CourseID).ToList(),
                     ProgressRecordIds = s.ProgressRecords.Select(p => p.ProgressID).ToList()
@@ -227,6 +228,41 @@ namespace OpenEdAI.API.Controllers
                 }
             }
 
+            return NoContent();
+        }
+
+        // PUT: api/Students/{userId}/CompleteSetup - Mark the student as having completed setup
+        [HttpPut("{userId}/CompleteSetup")]
+        public async Task<IActionResult> CompleteSetup(string userId)
+        {
+            // Ensure the user can only update their profile
+            if (!TryValidateUserId(userId))
+            {
+                return Forbid();
+            }
+            // Retrieve the student from the database
+            var student = await _context.Students.FindAsync(userId);
+            if (student == null)
+            {
+                return NotFound("Student not found");
+            }
+            // Mark the student as having completed setup
+            student.MarkSetupComplete();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Students.Any(s => s.UserID == userId))
+                {
+                    return NotFound("Student not found");
+                }
+                else
+                {
+                    throw;
+                }
+            }
             return NoContent();
         }
 

@@ -11,6 +11,9 @@ namespace OpenEdAI.API.Models
         [StringLength(100)]
         public string UserName { get; private set; }
 
+        // Flag to track if the student has completed setup
+        public bool HasCompletedSetup { get; private set; } = false;
+
         // One-to-Many: Courses this student has created
         public virtual ICollection<Course> CreatorCourses { get; private set; } = new List<Course>();
         // Many-to-Many: Courses this student is enrolled in
@@ -26,11 +29,17 @@ namespace OpenEdAI.API.Models
         {
             UserID = userId ?? throw new ArgumentException(nameof(userId)); // Prevent null values
             UserName = name;
+            HasCompletedSetup = false;
         }
 
         public void UpdateName(string newName)
         {
             UserName = newName;
+        }
+
+        public void MarkSetupComplete()
+        {
+            HasCompletedSetup = true;
         }
     }
 }

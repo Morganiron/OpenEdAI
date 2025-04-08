@@ -389,3 +389,4 @@ wwwroot/css/site.css
 Dockerfile
 docker-compose.yml
 *.patch
+/structure.txt
