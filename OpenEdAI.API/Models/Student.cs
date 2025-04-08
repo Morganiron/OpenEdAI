@@ -20,6 +20,9 @@ namespace OpenEdAI.API.Models
         public virtual ICollection<Course> EnrolledCourses { get; private set; } = new List<Course>();
         public virtual ICollection<CourseProgress> ProgressRecords { get; private set; } = new List<CourseProgress>();
 
+        // One-to-One: Profile belonging to this student
+        public virtual StudentProfile Profile { get; private set; }
+
 
         // Default Constructor
         internal Student() { }
@@ -40,6 +43,11 @@ namespace OpenEdAI.API.Models
         public void MarkSetupComplete()
         {
             HasCompletedSetup = true;
+        }
+
+        public void SetProfile(StudentProfile profile)
+        {
+            Profile = profile;
         }
     }
 }

@@ -40,6 +40,7 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<TokenManager>();
 builder.Services.AddScoped<LoadingService>();
+builder.Services.AddScoped<StudentService>();
 
 // Bind the AuthConfig section from appsettings.json and register it as a singleton
 var authConfig = builder.Configuration.GetSection("AuthConfig").Get<AuthConfig>();

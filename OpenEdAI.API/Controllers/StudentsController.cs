@@ -37,6 +37,13 @@ namespace OpenEdAI.API.Controllers
                     UserID = s.UserID,
                     Username = s.UserName,
                     HasCompletedSetup = s.HasCompletedSetup,
+                    Profile = s.Profile == null ? null : new StudentProfileDTO
+                    {
+                        EducationLevel = s.Profile.EducationLevel,
+                        PreferredContentTypes = s.Profile.PreferredContentTypes,
+                        SpecialConsiderations = s.Profile.SpecialConsiderations,
+                        AdditionalConsiderations = s.Profile.AdditionalConsiderations
+                    },
                     CreatorCourseIds = s.CreatorCourses.Select(c => c.CourseID).ToList(),
                     EnrolledCourseIds = s.EnrolledCourses.Select(c => c.CourseID).ToList(),
                     ProgressRecordIds = s.ProgressRecords.Select(p => p.ProgressID).ToList()
@@ -202,15 +209,37 @@ namespace OpenEdAI.API.Controllers
                 return Forbid();
             }
 
-            // Retrieve the student from the database
-            var student = await _context.Students.FindAsync(userId);
+            // Retrieve the student, including the profile
+            var student = await _context.Students
+                .Include(s => s.Profile)
+                .FirstOrDefaultAsync(s => s.UserID == userId);
+
             if (student == null)
             {
-                return NotFound();
+                return NotFound("Student not found");
             }
 
-            // Update only the allowed properties
+            // Update basic student info
             student.UpdateName(updateDto.Username);
+
+            // Update or create the profile
+            if (updateDto.Profile != null)
+            {
+                var profileDto = updateDto.Profile;
+
+                // Create a new StudentProfile instance based on the DTO
+                var newProfile = new StudentProfile
+                {
+                    UserId = student.UserID,
+                    EducationLevel = profileDto.EducationLevel,
+                    PreferredContentTypes = profileDto.PreferredContentTypes,
+                    SpecialConsiderations = profileDto.SpecialConsiderations,
+                    AdditionalConsiderations = profileDto.AdditionalConsiderations
+                };
+
+                // Set the profile
+                student.SetProfile(newProfile);
+            }
             
             try
             {

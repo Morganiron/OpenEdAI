@@ -13,6 +13,7 @@ namespace OpenEdAI.API.Data
         public DbSet<Course> Courses { get; set; }
         public DbSet<Lesson> Lessons { get; set; }
         public DbSet<CourseProgress> CourseProgress { get; set; }
+        public DbSet<StudentProfile> StudentProfiles { get; set; }
 
         public override int SaveChanges()
         {
@@ -95,6 +96,13 @@ namespace OpenEdAI.API.Data
                 .HasOne(cp => cp.Course)
                 .WithMany()
                 .HasForeignKey(cp => cp.CourseID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // One-To-One: A Student can have one profile
+            modelBuilder.Entity<Student>()
+                .HasOne(s => s.Profile)
+                .WithOne(p => p.Student)
+                .HasForeignKey<StudentProfile>(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }
