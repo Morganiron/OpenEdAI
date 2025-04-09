@@ -20,20 +20,14 @@ builder.Configuration
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.ListenAnyIP(80); // Aloways allow HTTP for internal/ALB
+    serverOptions.ListenAnyIP(80); // Always allow HTTP for internal/ALB
 
-    if (builder.Environment.IsDevelopment())
+    // Always listen on 443 with HTTPS regardless of environment
+    serverOptions.ListenAnyIP(443, listenOptions =>
     {
-        serverOptions.ListenAnyIP(443, listenOptions =>
-        {
-            listenOptions.UseHttps("/https/aspnetapp.pfx", "devcertpass");
-        });
-    }
-    else
-    {
-        // In production, HTTPS should be handled by ALB or reverse proxy
-        Console.WriteLine("Running in production, relying on external HTTPS (e.g., ALB with ACM)");
-    }
+        listenOptions.UseHttps("/https/aspnetapp.pfx", "devcertpass");
+    });
+    
     
 });
 
