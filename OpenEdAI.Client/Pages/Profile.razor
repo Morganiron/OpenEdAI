@@ -25,7 +25,7 @@
     else
     {
         <EditForm EditContext="editContext"
-                  OnValidSubmit="HandleValidSubmit">
+        OnValidSubmit="HandleValidSubmit">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
@@ -63,9 +63,9 @@
                 {
                     <div class="form-check">
                         <InputCheckbox class="form-check-input"
-                                       Value="@contentTypeSelections[type]"
-                                       ValueChanged="@(checkedValue => OnPreferredContentTypesChanged(type, checkedValue))"
-                                       ValueExpression="@(() => contentTypeSelections[type])" />
+                        Value="@contentTypeSelections[type]"
+                        ValueChanged="@(checkedValue => OnPreferredContentTypesChanged(type, checkedValue))"
+                        ValueExpression="@(() => contentTypeSelections[type])" />
 
                         <label class="form-check-label">@type</label>
                     </div>
@@ -78,7 +78,10 @@
                 @foreach (var option in availableSpecialConsiderations)
                 {
                     <div class="form-check">
-                        <InputCheckbox class="form-check-input" @bind-Value="specialConsiderationSelections[option]" />
+                        <InputCheckbox class="form-check-input"
+                        Value="@specialConsiderationSelections[option]"
+                        ValueChanged="@(value => OnSpecialConsiderationsChanged(option, value))"
+                        ValueExpression="@(() => specialConsiderationSelections[option])" />
                         <label class="form-check-label">@option</label>
                     </div>
                 }
@@ -110,7 +113,7 @@
                 else
                 {
                     <InputTextArea @bind-Value="profileModel.AdditionalConsiderations" class="form-control"
-                                   placeholder="@GetDefaultAdditionalPrompt()" />
+                    placeholder="@GetDefaultAdditionalPrompt()" />
                     <button type="button" class="btn btn-secondary mt-1" @onclick="() => isEditingAdditionalConsiderations = false">Cancel</button>
                 }
             </div>
@@ -149,7 +152,7 @@
     private string GetDefaultAdditionalPrompt()
     {
         string prefix = "";
-        if (!string.IsNullOrWhiteSpace(profileModel.EducationLevel) &&
+        if (!string.IsNullOrEmpty(profileModel.EducationLevel) &&
             profileModel.EducationLevel.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             prefix += $"{educationOtherDefault}\n";
@@ -170,6 +173,7 @@
             var student = await StudentService.GetCurrentStudentAsync();
             Console.WriteLine($"Current student on profile page: {student.Username}");
 
+            // Load profileModel
             profileModel.Username = student.Username;
             var profile = student.Profile;
             if (profile != null)
@@ -231,13 +235,30 @@
                 .Select(kv => kv.Key)
         );
 
-        // If you need to update validation or UI:
+        // Update validation
         editContext.NotifyValidationStateChanged();
-        // DumpValidationMessages(); // optional debug method
         StateHasChanged();
     }
 
+    private void OnSpecialConsiderationsChanged(string option, bool newValue)
+    {
+        // Update the dictionary for whichever checkbox changed.
+        specialConsiderationSelections[option] = newValue;
 
+        // Rebuild the SpecialConsiderations property from the dictionary.
+        profileModel.SpecialConsiderations = string.Join(", ",
+            specialConsiderationSelections
+                .Where(kv => kv.Value)
+                .Select(kv => kv.Key)
+        );
+
+        // Notify the EditContext of the change
+        editContext.NotifyValidationStateChanged();
+
+        Console.WriteLine($"Special Consideration changed: {profileModel.SpecialConsiderations}");
+
+        StateHasChanged();
+    }
 
     private void DumpValidationMessages()
     {
@@ -255,7 +276,7 @@
     {
         // Ensure username is set
         var student = await StudentService.GetCurrentStudentAsync();
-		profileModel.Username = student.Username;
+        profileModel.Username = student.Username;
 
         // Ensure that AdditionalConsiderations is not empty.
         // If it is empty, assign it a single whitespace.
@@ -269,20 +290,6 @@
         Loader.Show();
         try
         {
-            Console.WriteLine("Submitting profile...");
-            Console.WriteLine($"EducationLevel: {profileModel.EducationLevel}");
-            Console.WriteLine($"PreferredContentTypes (before update): {profileModel.PreferredContentTypes}");
-            Console.WriteLine("contentTypeSelections:");
-            foreach (var kv in contentTypeSelections)
-            {
-                Console.WriteLine($"{kv.Key}: {kv.Value}");
-            }
-            Console.WriteLine("specialConsiderationSelections:");
-            foreach (var kv in specialConsiderationSelections)
-            {
-                Console.WriteLine($"{kv.Key}: {kv.Value}");
-            }
-
             // Update Special Considerations
             var selectedSpecial = specialConsiderationSelections
                 .Where(kv => kv.Value)
@@ -299,11 +306,6 @@
             }
 
             profileModel.SpecialConsiderations = string.Join(", ", selectedSpecial);
-
-            
-
-            Console.WriteLine($"Updated PreferredContentTypes: {profileModel.PreferredContentTypes}");
-            Console.WriteLine($"Updated SpecialConsiderations: {profileModel.SpecialConsiderations}");
 
             await StudentService.UpdateStudentProfileAsync(profileModel.ToUpdateDTO());
 
@@ -359,6 +361,7 @@
             {
                 if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
                 {
+                    AdditionalConsiderations = "";
                     yield return new ValidationResult(
                         "Additional Information is required when Education is 'Other'.",
                         new[] { nameof(AdditionalConsiderations) });
@@ -371,6 +374,7 @@
             {
                 if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
                 {
+                    AdditionalConsiderations = "";
                     yield return new ValidationResult(
                         "Additional Information is required when Special Consideration is 'Other'.",
                         new[] { nameof(AdditionalConsiderations) });
