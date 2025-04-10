@@ -203,13 +203,13 @@ namespace OpenEdAI.API.Controllers
         [HttpPut("{userId}")]
         public async Task<IActionResult> UpdateStudent(string userId, UpdateStudentDTO updateDto)
         {
-            // Ensure the user can only update their profile
+            // Ensure the user can only update their own profile.
             if (!TryValidateUserId(userId))
             {
                 return Forbid();
             }
 
-            // Retrieve the student, including the profile
+            // Retrieve the student along with its Profile (if any)
             var student = await _context.Students
                 .Include(s => s.Profile)
                 .FirstOrDefaultAsync(s => s.UserID == userId);
@@ -219,28 +219,40 @@ namespace OpenEdAI.API.Controllers
                 return NotFound("Student not found");
             }
 
-            // Update basic student info
+            // Update basic student info.
             student.UpdateName(updateDto.Username);
 
-            // Update or create the profile
+            // Update or create the profile if a Profile DTO is provided.
             if (updateDto.Profile != null)
             {
                 var profileDto = updateDto.Profile;
 
-                // Create a new StudentProfile instance based on the DTO
-                var newProfile = new StudentProfile
+                if (student.Profile == null)
                 {
-                    UserId = student.UserID,
-                    EducationLevel = profileDto.EducationLevel,
-                    PreferredContentTypes = profileDto.PreferredContentTypes,
-                    SpecialConsiderations = profileDto.SpecialConsiderations,
-                    AdditionalConsiderations = profileDto.AdditionalConsiderations
-                };
+                    // No profile exists yet—create one
+                    var newProfile = new StudentProfile
+                    {
+                        // UserId must be set to match the student's key.
+                        UserId = student.UserID,
+                        EducationLevel = profileDto.EducationLevel,
+                        PreferredContentTypes = profileDto.PreferredContentTypes,
+                        SpecialConsiderations = profileDto.SpecialConsiderations,
+                        AdditionalConsiderations = profileDto.AdditionalConsiderations
+                    };
 
-                // Set the profile
-                student.SetProfile(newProfile);
+                    // Attach the new profile to the student.
+                    student.SetProfile(newProfile);
+                }
+                else
+                {
+                    // Profile exists; update its properties.
+                    student.Profile.EducationLevel = profileDto.EducationLevel;
+                    student.Profile.PreferredContentTypes = profileDto.PreferredContentTypes;
+                    student.Profile.SpecialConsiderations = profileDto.SpecialConsiderations;
+                    student.Profile.AdditionalConsiderations = profileDto.AdditionalConsiderations;
+                }
             }
-            
+
             try
             {
                 await _context.SaveChangesAsync();
@@ -259,6 +271,7 @@ namespace OpenEdAI.API.Controllers
 
             return NoContent();
         }
+
 
         // PUT: api/Students/{userId}/CompleteSetup - Mark the student as having completed setup
         [HttpPut("{userId}/CompleteSetup")]

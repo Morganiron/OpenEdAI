@@ -1,0 +1,399 @@
+﻿@page "/profile"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Routing
+@using OpenEdAI.Client.Models
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject Services.LoadingService Loader
+@inject Services.StudentService StudentService
+
+<!-- Prevent navigation if required fields are not completed -->
+<NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
+
+<div class="profile-container">
+
+    <h3>Your Profile</h3>
+
+    @if (isLoading)
+    {
+        <p>Loading profile...</p>
+    }
+    else if (profileModel == null)
+    {
+        <p>Error loading profile.</p>
+    }
+    else
+    {
+        <EditForm EditContext="editContext"
+                  OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <!-- Custom Error Message -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @errorMessage
+                </div>
+            }
+
+            <!-- Username read-only from Cognito -->
+            <div class="mb-3">
+                <label class="form-label">
+                    Username: <span class="username-display">@profileModel.Username</span>
+                </label>
+            </div>
+
+            <!-- Education Level as a dropdown -->
+            <div class="mb-3">
+                <label class="form-label">Education Level:</label>
+                <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select">
+                    <option value="">Select your education level</option>
+                    @foreach (var level in availableEducationLevels)
+                    {
+                        <option value="@level">@level</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <!-- Preferred Content Type checkboxes -->
+            <div class="mb-3">
+                <label class="form-label">Preferred Content Types:</label>
+                @foreach (var type in availableContentTypes)
+                {
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input"
+                                       Value="@contentTypeSelections[type]"
+                                       ValueChanged="@(checkedValue => OnPreferredContentTypesChanged(type, checkedValue))"
+                                       ValueExpression="@(() => contentTypeSelections[type])" />
+
+                        <label class="form-check-label">@type</label>
+                    </div>
+                }
+            </div>
+
+            <!-- Special Considerations checkboxes -->
+            <div class="mb-3">
+                <label class="form-label">Special Considerations(optional):</label>
+                @foreach (var option in availableSpecialConsiderations)
+                {
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="specialConsiderationSelections[option]" />
+                        <label class="form-check-label">@option</label>
+                    </div>
+                }
+                <small class="text-muted">
+                    If "Other" is selected in Education or Special Considerations,<br />
+                    please provide details in Additional Information.
+                </small>
+            </div>
+
+            <!-- Additional Considerations Information -->
+            <div class="mb-3">
+                <label class="form-label">Additional Information:</label>
+                @if (!isEditingAdditionalConsiderations)
+                {
+                    <div>
+                        @if (string.IsNullOrWhiteSpace(profileModel.AdditionalConsiderations))
+                        {
+                            <em>No Additional information provided.</em>
+                        }
+                        else
+                        {
+                            @profileModel.AdditionalConsiderations
+                        }
+                        <button type="button" class="btn btn-link" @onclick="() => isEditingAdditionalConsiderations = true">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <InputTextArea @bind-Value="profileModel.AdditionalConsiderations" class="form-control"
+                                   placeholder="@GetDefaultAdditionalPrompt()" />
+                    <button type="button" class="btn btn-secondary mt-1" @onclick="() => isEditingAdditionalConsiderations = false">Cancel</button>
+                }
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Profile Changes</button>
+
+        </EditForm>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private ProfileModel profileModel = new ProfileModel();
+    private EditContext editContext;
+
+    // Editing flags for each field
+    private bool isEditingAdditionalConsiderations = false;
+
+    // Available options
+    private List<string> availableEducationLevels = new() { "Elementary", "Middle School", "High School", "Associate's", "Bachelor's", "Master's", "PhD", "Other" };
+    private List<string> availableContentTypes = new() { "Video tutorials", "Articles", "Discussion forums" };
+    private List<string> availableSpecialConsiderations = new() { "ADHD", "Autism", "Dyslexia", "Other" };
+
+    // Checkboxes for Preferred content types
+    private Dictionary<string, bool> contentTypeSelections = new Dictionary<string, bool>();
+
+    // Checkboxes for Special Considerations
+    private Dictionary<string, bool> specialConsiderationSelections = new Dictionary<string, bool>();
+
+    // Default prompt text for Additional Considerations field
+    private readonly string educationOtherDefault = "Education(Other): Please enter your education";
+    private readonly string specialOtherDefault = "Special Considerations(Other): Please enter your special circumstance";
+
+    // Method to build the default prompt(s) based on the current selections
+    private string GetDefaultAdditionalPrompt()
+    {
+        string prefix = "";
+        if (!string.IsNullOrWhiteSpace(profileModel.EducationLevel) &&
+            profileModel.EducationLevel.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            prefix += $"{educationOtherDefault}\n";
+        }
+        if (specialConsiderationSelections.Any(x => x.Value && x.Key.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0))
+        {
+            prefix += $"{specialOtherDefault}\n";
+        }
+        return prefix;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Loader.Show();
+        try
+        {
+            Console.WriteLine("Attempting to get current student");
+            var student = await StudentService.GetCurrentStudentAsync();
+            Console.WriteLine($"Current student on profile page: {student.Username}");
+
+            profileModel.Username = student.Username;
+            var profile = student.Profile;
+            if (profile != null)
+            {
+                profileModel.EducationLevel = profile.EducationLevel;
+                profileModel.PreferredContentTypes = profile.PreferredContentTypes;
+                profileModel.SpecialConsiderations = profile.SpecialConsiderations;
+                profileModel.AdditionalConsiderations = profile.AdditionalConsiderations;
+            }
+            else
+            {
+                profileModel = new ProfileModel { Username = student.Username };
+            }
+
+            editContext = new EditContext(profileModel);
+
+            foreach (var type in availableContentTypes)
+            {
+                contentTypeSelections[type] = !string.IsNullOrEmpty(profileModel.PreferredContentTypes) &&
+                    profileModel.PreferredContentTypes.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => x.Trim())
+                        .Contains(type);
+            }
+
+            foreach (var option in availableSpecialConsiderations)
+            {
+                specialConsiderationSelections[option] = false;
+            }
+            if (!string.IsNullOrEmpty(profileModel.SpecialConsiderations))
+            {
+                var selectedOptions = profileModel.SpecialConsiderations.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim());
+                foreach (var option in availableSpecialConsiderations)
+                {
+                    specialConsiderationSelections[option] = selectedOptions.Contains(option);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            Loader.Hide();
+        }
+    }
+
+    private void OnPreferredContentTypesChanged(string type, bool newValue)
+    {
+        // Update the dictionary for whichever checkbox changed.
+        contentTypeSelections[type] = newValue;
+
+        // Rebuild the comma-separated string in the model.
+        profileModel.PreferredContentTypes = string.Join(", ",
+            contentTypeSelections
+                .Where(kv => kv.Value)
+                .Select(kv => kv.Key)
+        );
+
+        // If you need to update validation or UI:
+        editContext.NotifyValidationStateChanged();
+        // DumpValidationMessages(); // optional debug method
+        StateHasChanged();
+    }
+
+
+
+    private void DumpValidationMessages()
+    {
+        if (editContext != null)
+        {
+            var messages = editContext.GetValidationMessages();
+            foreach (var message in messages)
+            {
+                Console.WriteLine("Validation Message: " + message);
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // Ensure username is set
+        var student = await StudentService.GetCurrentStudentAsync();
+		profileModel.Username = student.Username;
+
+        // Ensure that AdditionalConsiderations is not empty.
+        // If it is empty, assign it a single whitespace.
+        if (string.IsNullOrEmpty(profileModel.AdditionalConsiderations))
+        {
+            profileModel.AdditionalConsiderations = " ";
+        }
+
+        DumpValidationMessages();
+
+        Loader.Show();
+        try
+        {
+            Console.WriteLine("Submitting profile...");
+            Console.WriteLine($"EducationLevel: {profileModel.EducationLevel}");
+            Console.WriteLine($"PreferredContentTypes (before update): {profileModel.PreferredContentTypes}");
+            Console.WriteLine("contentTypeSelections:");
+            foreach (var kv in contentTypeSelections)
+            {
+                Console.WriteLine($"{kv.Key}: {kv.Value}");
+            }
+            Console.WriteLine("specialConsiderationSelections:");
+            foreach (var kv in specialConsiderationSelections)
+            {
+                Console.WriteLine($"{kv.Key}: {kv.Value}");
+            }
+
+            // Update Special Considerations
+            var selectedSpecial = specialConsiderationSelections
+                .Where(kv => kv.Value)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            // If Special Consideration "Other" is selected, remove its literal value and simply record "Other"
+            if (specialConsiderationSelections.Any(x => x.Value && x.Key.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                selectedSpecial = selectedSpecial
+                    .Where(s => s.IndexOf("Other", StringComparison.OrdinalIgnoreCase) < 0)
+                    .ToList();
+                selectedSpecial.Add("Other");
+            }
+
+            profileModel.SpecialConsiderations = string.Join(", ", selectedSpecial);
+
+            
+
+            Console.WriteLine($"Updated PreferredContentTypes: {profileModel.PreferredContentTypes}");
+            Console.WriteLine($"Updated SpecialConsiderations: {profileModel.SpecialConsiderations}");
+
+            await StudentService.UpdateStudentProfileAsync(profileModel.ToUpdateDTO());
+
+            Navigation.NavigateTo("/generate-course", replace: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving profile: {ex.Message}");
+        }
+        finally
+        {
+            Loader.Hide();
+        }
+    }
+
+    private async Task<bool> ConfirmNavigationAsync(LocationChangingContext context)
+    {
+        if (profileModel.IsProfileIncomplete())
+        {
+            context.PreventNavigation();
+            return false;
+        }
+        return true;
+    }
+
+    public class ProfileModel : IValidatableObject
+    {
+        public string Username { get; set; }
+        public string EducationLevel { get; set; }
+        public string PreferredContentTypes { get; set; }
+        public string SpecialConsiderations { get; set; }
+        public string AdditionalConsiderations { get; set; }
+
+        public bool IsProfileIncomplete() =>
+            string.IsNullOrWhiteSpace(EducationLevel) ||
+            string.IsNullOrWhiteSpace(PreferredContentTypes);
+
+        // Consolidated custom validation:
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (string.IsNullOrWhiteSpace(EducationLevel))
+            {
+                yield return new ValidationResult("Education level is required.", new[] { nameof(EducationLevel) });
+            }
+            if (string.IsNullOrWhiteSpace(PreferredContentTypes))
+            {
+                yield return new ValidationResult("Preferred content types are required.", new[] { nameof(PreferredContentTypes) });
+            }
+
+            // For "Other" selections, if EducationLevel contains "Other" but AdditionalConsiderations is empty:
+            if (!string.IsNullOrWhiteSpace(EducationLevel) &&
+                EducationLevel.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
+                {
+                    yield return new ValidationResult(
+                        "Additional Information is required when Education is 'Other'.",
+                        new[] { nameof(AdditionalConsiderations) });
+                }
+            }
+
+            // Similarly, if SpecialConsiderations contains "Other" but AdditionalConsiderations is empty:
+            if (!string.IsNullOrWhiteSpace(SpecialConsiderations) &&
+                SpecialConsiderations.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
+                {
+                    yield return new ValidationResult(
+                        "Additional Information is required when Special Consideration is 'Other'.",
+                        new[] { nameof(AdditionalConsiderations) });
+                }
+            }
+        }
+
+        public UpdateStudentDTO ToUpdateDTO()
+        {
+            return new UpdateStudentDTO
+                {
+                
+                    Username = this.Username,
+                    Profile = new StudentProfileDTO
+                    {
+                        EducationLevel = this.EducationLevel,
+                        PreferredContentTypes = this.PreferredContentTypes,
+                        SpecialConsiderations = this.SpecialConsiderations,
+                        AdditionalConsiderations = this.AdditionalConsiderations
+                    }
+                };
+        }
+
+
+    }
+}

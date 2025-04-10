@@ -46,22 +46,30 @@ namespace OpenEdAI.Client.Services
             return studentDTO?.Profile;
         }
 
-        public async Task UpdateStudentProfileAsync(StudentProfileDTO profile)
+        public async Task UpdateStudentProfileAsync(UpdateStudentDTO updateDto)
         {
-            // Retrieve the current user's authentication state
+            // Retrieve the current user's authentication state.
             var authState = await _authStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
+
+            // Get the user's sub and username from the token.
             var userId = user.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userId))
+            var username = user.FindFirst("username")?.Value;
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
             {
-                throw new Exception("User is not authenticated or user id not found.");
+                throw new Exception("User is not authenticated or user id/username not found.");
             }
+
+            // Ensure that the update DTO has the username.
+            updateDto.Username = username;
+
             // Call the backend endpoint PUT api/students/{userId}
-            var response = await _http.PutAsJsonAsync($"api/students/{userId}", profile);
+            var response = await _http.PutAsJsonAsync($"api/students/{userId}", updateDto);
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception($"Error updating student profile: {response.ReasonPhrase}");
             }
         }
+
     }
 }

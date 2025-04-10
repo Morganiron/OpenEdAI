@@ -8,6 +8,7 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject Services.TokenManager TokenManager
+@inject Services.StudentService StudentService
 
 <GlobalLoading /> 
 
@@ -21,8 +22,8 @@
 		if (!string.IsNullOrWhiteSpace(existingToken) && existingToken != "null" && TokenManager.IsTokenValid(existingToken))
 		{
 			Console.WriteLine("[AuthCallback] Existing access token found. Redirecting to dashboard.");
-			Navigation.NavigateTo("/dashboard", replace: true);
 			_hasExchangedCode = true;
+			await DeterminePostAuthNavigation();
 			return;
 		}
 
@@ -104,8 +105,8 @@
 					// Wait for a second before redirecting to give the JS time to store the tokens
 					Console.WriteLine("Waiting for 200ms before redirecting...");
 					await Task.Delay(200);
-					Console.WriteLine("Redirecting to dashboard...");
-					Navigation.NavigateTo("/dashboard", replace: true);
+					// Redirect accordingly
+					await DeterminePostAuthNavigation();
 				}
 				else
 				{
@@ -126,6 +127,43 @@
 		catch (Exception ex)
 		{
 			Console.WriteLine($"Exception during token exchange: {ex.Message}");
+			Navigation.NavigateTo("/", forceLoad: false);
+		}
+		finally
+		{
+			Loader.Hide();
+		}
+	}
+
+	// Determine whether the student has completed the initial setup and navigate accordingly
+	private async Task DeterminePostAuthNavigation()
+	{
+		try
+		{
+			// Retrieve the student data using the StudentService
+			var student = await StudentService.GetCurrentStudentAsync();
+
+			if (student == null)
+			{
+				Console.WriteLine("Student not found. Redirecting to landing page.");
+				Navigation.NavigateTo("/", replace: true);
+				return;
+			}
+
+			if (!student.HasCompletedSetup)
+			{
+				Console.WriteLine("Student has not completed setup. Redirecting to setup page.");
+				Navigation.NavigateTo("/profile", replace: true);
+			}
+			else
+			{
+				Console.WriteLine("Student setup complete. Redirecting to dashboard.");
+				Navigation.NavigateTo("/dashboard", replace: true);
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error during post-authentication navigation: {ex.Message}");
 			Navigation.NavigateTo("/", forceLoad: false);
 		}
 		finally
