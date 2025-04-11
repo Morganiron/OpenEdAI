@@ -1,0 +1,33 @@
+﻿@using OpenEdAI.Client.Models
+
+<div class="course-plan-display">
+	<h2>@(IsFinalized ? "Your Course Plan" : "Proposed Course Plan")</h2>
+
+	<h3>@Plan.Title</h3>
+
+	@if (Plan.Lessons == null || !Plan.Lessons.Any())
+	{
+		<p>No Lessons available for this course plan.</p>
+	}
+	else
+	{
+		<ul class="lesson-list">
+			@foreach (var lesson in Plan.Lessons)
+			{
+				<li>
+					<h5>@lesson.Title</h5>
+					<h5>@lesson.Description</h5>
+					@if (IsFinalized && !string.IsNullOrWhiteSpace(lesson.ContentLink))
+					{
+						<p><a href="@lesson.ContentLink" target="_blank">View Content</a></p>
+					}
+				</li>
+			}
+		</ul>
+	}
+</div>
+
+@code {
+	[Parameter] public CoursePlanDTO Plan { get; set; }
+	[Parameter] public bool IsFinalized { get; set; } = false;
+}

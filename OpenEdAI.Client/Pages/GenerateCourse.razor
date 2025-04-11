@@ -1,11 +1,158 @@
 ﻿@page "/generate-course"
+@using System.ComponentModel.DataAnnotations
+@using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Services
+@using OpenEdAI.Client.Components
+@using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject Services.LoadingService Loader
-@inject Services.StudentService StudentService
 
-<h3>Generate Your Custom Course Plan</h3>
+<div class="generate-course-container">
+	<h2>Create Your Custom Learning Path</h2>
+	<p class="intro-text">
+		Welcome to the Course Generator! Based on your preferences, we'll use AI to create a personalized course outline!
+	</p>
+
+	@if (generatedPlan != null)
+	{
+		<CoursePlanDisplay Plan="generatedPlan" IsFinalized="@isFinalized" />
+
+		<button class="btn btn-success finalize-button" @onclick="FinalizeCoursePlan">Choose this course plan</button>
+
+		<CoursePlanChat Messages="chatMessages" OnUserMessageSent="HandleUserChatMessage" />
+	}
+	else
+	{
+		<CourseInput OnGenerate="HandleCourseInput" />
+	}
+</div>
+
 
 @code {
+	private CoursePlanDTO generatedPlan;
+	private bool isFinalized = false;
+	private List<CoursePlanChat.ChatMessage> chatMessages = new();
 
+	private async Task HandleCourseInput(CoursePersonalizationInput input)
+	{
+		try
+		{
+			Loader.Show();
+
+			var response = await Http.PostAsJsonAsync("ai/generate-course", input);
+
+			if (response.IsSuccessStatusCode)
+			{
+				generatedPlan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
+				chatMessages.Clear();
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				Console.WriteLine($"Error generating course: {error}");
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Exception generating course: {ex.Message}");
+		}
+		finally
+		{
+			Loader.Hide();
+		}
+	}
+
+	private async Task HandleUserChatMessage(string userMessage)
+	{
+		try
+		{
+			Loader.Show();
+
+			Console.WriteLine("Sending adjustment request...");
+			Console.WriteLine($"User message: {userMessage}");
+
+			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
+			Console.WriteLine("Serialized generated plan:");
+			Console.WriteLine(serializedPlan);
+
+			var requestPayload = new
+			{
+				UserMessage = userMessage,
+				PreviousPlan = serializedPlan
+			};
+
+			Console.WriteLine("Making POST request to /ai/adjust-course...");
+			var response = await Http.PostAsJsonAsync("ai/adjust-course", requestPayload);
+
+			Console.WriteLine($"Response received: {(int)response.StatusCode} {response.StatusCode}");
+
+			if (response.IsSuccessStatusCode)
+			{
+				var json = await response.Content.ReadAsStringAsync();
+				Console.WriteLine("Raw JSON from response:");
+				Console.WriteLine(json);
+
+				var adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(json, new JsonSerializerOptions
+					{
+						PropertyNameCaseInsensitive = true
+					});
+
+				if (adjustedPlan != null)
+				{
+					generatedPlan = adjustedPlan;
+					chatMessages.Add(new CoursePlanChat.ChatMessage
+						{
+							Text = "Course plan updated based on your request.",
+							IsUser = false
+						});
+				}
+				else
+				{
+					Console.WriteLine("Deserialization returned null.");
+					chatMessages.Add(new CoursePlanChat.ChatMessage
+						{
+							Text = "The adjustment was processed but no valid plan was returned.",
+							IsUser = false
+						});
+				}
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				Console.WriteLine("Error from backend:");
+				Console.WriteLine(error);
+
+				chatMessages.Add(new CoursePlanChat.ChatMessage { Text = "Error processing your request. Please try again.", IsUser = false });
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Exception in HandleUserChatMessage: {ex}");
+			chatMessages.Add(new CoursePlanChat.ChatMessage
+				{
+					Text = "An unexpected error occurred while sending your request.",
+					IsUser = false
+				});
+		}
+		finally
+		{
+			Loader.Hide();
+		}
+	}
+
+
+	private void FinalizeCoursePlan()
+	{
+		isFinalized = true;
+		
+		Console.WriteLine("Course plan finalized.");
+
+		// TODO: Add logic to send data to the backend for processing
+		// Notify the user that it may take some time to process and they will be notified when it is complete.
+		// Redirect the user to the dashboard
+
+		// Temporary redirect to dashboard
+		Navigation.NavigateTo("/dashboard");
+	}
 }

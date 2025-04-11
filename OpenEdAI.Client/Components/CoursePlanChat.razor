@@ -1,0 +1,48 @@
+﻿@using Microsoft.AspNetCore.Components
+@using System.Collections.Generic
+
+<div class="course-chat-box">
+	<h4>Discuss any adjustments you'd like the AI to make to your course plan.</h4>
+
+	<div class="chat-log">
+		@foreach (var message in Messages)
+		{
+			<div class="chat-message @(message.IsUser ? "user-message" : "ai-message")">
+				<strong>@(message.IsUser ? "You:" : "AI:")</strong>
+				<p>@message.Text</p>
+			</div>
+		}
+	</div>
+
+	<EditForm Model="@this" OnValidSubmit="SendMessage">
+		<div class="chat-input-area">
+			<InputTextArea @bind-Value="UserInput" class="chat-input" placeholder="Ask a question or request changes..." />
+			<button type="submit" class="send-button">Send</button>
+		</div>
+	</EditForm>
+
+</div>
+
+@code {
+	private string UserInput { get; set; } = string.Empty;
+
+	[Parameter] public List<ChatMessage> Messages { get; set; } = new();
+	[Parameter] public EventCallback<string> OnUserMessageSent { get; set; }
+
+	private async Task SendMessage()
+	{
+		if (!string.IsNullOrWhiteSpace(UserInput))
+		{
+			Messages.Add(new ChatMessage { Text = UserInput, IsUser = true });
+			await OnUserMessageSent.InvokeAsync(UserInput);
+			UserInput = string.Empty;
+		}
+	}
+
+
+	public class ChatMessage
+	{
+		public string Text { get; set; }
+		public bool IsUser { get; set; }
+	}
+}
