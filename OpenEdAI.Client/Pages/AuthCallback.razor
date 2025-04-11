@@ -150,10 +150,15 @@
 				return;
 			}
 
-			if (!student.HasCompletedSetup)
+			if (!student.HasCompletedSetup && student.Profile == null)
 			{
-				Console.WriteLine("Student has not completed setup. Redirecting to setup page.");
+				Console.WriteLine("Student has not completed setup. Redirecting to profile page.");
 				Navigation.NavigateTo("/profile", replace: true);
+			}
+			else if (!student.HasCompletedSetup)
+			{
+				Console.WriteLine("Student has completed profile, but not completed setup. Redirecting to generate-course page.");
+				Navigation.NavigateTo("/generate-course", replace: true);
 			}
 			else
 			{

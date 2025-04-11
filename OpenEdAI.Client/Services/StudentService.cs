@@ -71,5 +71,16 @@ namespace OpenEdAI.Client.Services
             }
         }
 
+        public async Task<(bool HasCompletedSetup, bool HasProfileData)> GetStudentStatusAsync()
+        {
+            // Retrieve the current student
+            var student = await GetCurrentStudentAsync();
+
+            bool hasProfileData = student.Profile != null &&
+                !string.IsNullOrWhiteSpace(student.Profile.EducationLevel);
+
+            return (student.HasCompletedSetup, hasProfileData);
+        }
+
     }
 }

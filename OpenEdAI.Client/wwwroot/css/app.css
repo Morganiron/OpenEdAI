@@ -85,6 +85,59 @@
         margin-right: 0;
     }
 
+
+/* ========== Notification Banner ========== */
+.notification-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(5px);
+    background-color: rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.notification-popup {
+    background-color: #fff;
+    color: #2c3e50;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border-left: 6px solid #2c3e50;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 /* ========== Course Cards ========== */
 .course-card {
     border: 1px solid #ddd;

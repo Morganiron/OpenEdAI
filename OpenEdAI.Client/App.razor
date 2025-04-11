@@ -1,7 +1,10 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using OpenEdAI.Client.Services
 @inject OpenEdAI.Client.Models.AuthConfig Auth
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject StudentService StudentService
+@inject NotificationService Notification
 
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
@@ -38,32 +41,35 @@
     </Router>
 </CascadingAuthenticationState>
 
-<!-- Redirect to Cogntio login if there is not a valid token in localStorage -->
+
 @code {
     protected override async Task OnInitializedAsync()
     {
-		// var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        try
+        {
+            // Get student status
+            var (hasCompletedSetup, hasProfileData) = await StudentService.GetStudentStatusAsync();
 
-		// // Allow /auth-callback and /landing pages to load without a token
-  //       if (relativePath == "" || relativePath.StartsWith("auth-callback", StringComparison.OrdinalIgnoreCase))
-  //       {
-  //           return;
-  //       }
-		// // Otherwise, check for the token in localStorage
-  //       var token = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
+            if (!hasCompletedSetup)
+            {
+                if (hasProfileData)
+                {
+                    Navigation.NavigateTo("/generate-course", forceLoad: false);
+                    Notification.Notify("Please generate your first course to complete your initial setup.");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/profile", forceLoad: false);
 
-  //       Console.WriteLine($"LocalStorage token: {token}");
-
-  //       if (string.IsNullOrWhiteSpace(token) || token.Trim().ToLower() == "null")
-  //       {
-  //           Console.WriteLine("No token found in localStorage. Redirecting to login.");
-  //           // Immediately redirect to the congnito login
-  //           Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
-  //       }
-  //       else
-  //       {
-  //           Console.WriteLine("Access token found, continuing...");
-  //       }
+                    Notification.Notify("Please complete your profile to begin setting up your personalized course.");
+                }
+            }
+        }
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error checking student status: {ex.Message}");
+			
+		}
     }
 
 }
