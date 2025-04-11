@@ -18,7 +18,7 @@
 	{
 		<CoursePlanDisplay Plan="generatedPlan" IsFinalized="@isFinalized" />
 
-		<button class="btn btn-success finalize-button" @onclick="FinalizeCoursePlan">Choose this course plan</button>
+		<button class="btn btn-success send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
 
 		<CoursePlanChat Messages="chatMessages" OnUserMessageSent="HandleUserChatMessage" />
 	}
@@ -142,17 +142,48 @@
 	}
 
 
-	private void FinalizeCoursePlan()
+	private async Task SubmitCoursePlan()
 	{
-		isFinalized = true;
 		
-		Console.WriteLine("Course plan finalized.");
 
-		// TODO: Add logic to send data to the backend for processing
-		// Notify the user that it may take some time to process and they will be notified when it is complete.
-		// Redirect the user to the dashboard
+		Loader.Show();
+		try
+		{
+			var response = await Http.PostAsJsonAsync("ai/submit-course", generatedPlan);
 
-		// Temporary redirect to dashboard
-		Navigation.NavigateTo("/dashboard");
+			if (response.IsSuccessStatusCode)
+			{
+				var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+				if (result.TryGetProperty("message", out var messageElement))
+				{
+					Console.WriteLine($"Backend message: {messageElement.GetString()}");
+				}
+
+				// TODO: Add a notification/popup to inform the user that the course is being finalized and they will be notified when it's ready.
+
+				// Mark the course as finalized
+				isFinalized = true;
+
+				// TODO: Add logic to send data to the backend for processing
+
+				// Redirect to dashboard
+				Navigation.NavigateTo("/dashboard");
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				Console.WriteLine($"Error submitting course: {error}");
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Exception submitting course: {ex.Message}");
+		}
+		finally
+		{
+			
+			
+			Loader.Hide();
+		}
 	}
 }
