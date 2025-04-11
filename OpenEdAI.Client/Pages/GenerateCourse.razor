@@ -8,7 +8,12 @@
 @using System.Text.Json
 @inject HttpClient Http
 @inject NavigationManager Navigation
-@inject Services.LoadingService Loader
+@inject LoadingService Loader
+@inject IJSRuntime JS
+@inject LogoutService LogoutService
+
+<!-- Prevent navigation if required fields are not completed -->
+<NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
 <div class="generate-course-container">
 	<h2>Create Your Custom Learning Path</h2>
@@ -35,6 +40,7 @@
 	private CoursePlanDTO generatedPlan;
 	private bool isFinalized = false;
 	private List<CoursePlanChat.ChatMessage> chatMessages = new();
+	private bool isLoggingOut = false;
 
 	private async Task HandleCourseInput(CoursePersonalizationInput input)
 	{
@@ -63,6 +69,23 @@
 		{
 			Loader.Hide();
 		}
+	}
+
+	private Task ConfirmNavigationAsync(LocationChangingContext context)
+	{
+		if (LogoutService.IsLoggingOut)
+		{
+			// Allow navigation if it's a logout
+			return Task.CompletedTask;
+		}
+
+		if (generatedPlan == null || !isFinalized)
+		{
+			// Prevent navigating away if a course plan is generated and not finalized (shows a confirmation dialog)
+			context.PreventNavigation();
+		}
+
+		return Task.CompletedTask;
 	}
 
 	private async Task HandleUserChatMessage(string userMessage)
@@ -146,8 +169,6 @@
 
 	private async Task SubmitCoursePlan()
 	{
-		
-
 		Loader.Show();
 		try
 		{

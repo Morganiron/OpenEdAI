@@ -4,10 +4,13 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Routing
 @using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Services
 @inject NavigationManager Navigation
 @inject HttpClient Http
-@inject Services.LoadingService Loader
-@inject Services.StudentService StudentService
+@inject LoadingService Loader
+@inject StudentService StudentService
+@inject LogoutService LogoutService
+@inject IJSRuntime JS
 
 <!-- Prevent navigation if required fields are not completed -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -131,6 +134,7 @@
     private string errorMessage = string.Empty;
     private ProfileModel profileModel = new ProfileModel();
     private EditContext editContext;
+	private bool isLoggingOut = false;
 
     // Editing flags for each field
     private bool isEditingAdditionalConsiderations = false;
@@ -323,14 +327,20 @@
         }
     }
 
-    private async Task<bool> ConfirmNavigationAsync(LocationChangingContext context)
+    private Task ConfirmNavigationAsync(LocationChangingContext context)
     {
+        if (LogoutService.IsLoggingOut)
+        {
+            // Allow navigation if it's a logout
+            return Task.CompletedTask;
+        }
+
         if (profileModel.IsProfileIncomplete())
         {
+            // Block navigation if profile is incomplete.
             context.PreventNavigation();
-            return false;
         }
-        return true;
+        return Task.CompletedTask;
     }
 
     public class ProfileModel : IValidatableObject

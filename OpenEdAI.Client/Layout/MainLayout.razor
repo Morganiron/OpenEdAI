@@ -8,6 +8,7 @@
 @inject OpenEdAI.Client.Models.AuthConfig Auth
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NotificationService Notification
+@inject LogoutService LogoutService
 
 <!-- Navbar -->
 <nav class="navbar">
@@ -103,6 +104,7 @@
 
 	private async Task Logout()
 	{
+		LogoutService.StartLogout();
 		Console.WriteLine("Logging out: Clearing stored tokens.");
 		// Clear the tokens from localStorage
 		await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
@@ -110,11 +112,11 @@
 
 		// Redirect to the Cognito logout URL
 		Console.WriteLine("Redirecting to Cognito logout...");
-		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: false);
+		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: true);
 	}
 
 	private void Login()
 	{
-		Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: false);
+		Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
 	}
 }
