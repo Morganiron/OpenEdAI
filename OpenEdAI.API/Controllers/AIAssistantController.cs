@@ -76,6 +76,7 @@ namespace OpenEdAI.API.Controllers
             var mockPlan = new CoursePlanDTO
             {
                 Title = input.Topic,
+                Description = "AI generated course description",
                 Lessons = new List<LessonDTO>
                 {
                     new LessonDTO
@@ -194,6 +195,7 @@ namespace OpenEdAI.API.Controllers
             var adjustedPlan = new CoursePlanDTO
             {
                 Title = "Adjusted: " + previousPlan?.Title,
+                Description = "AI Adjusted Generated Course Description",
                 Lessons = new List<LessonDTO>
                 {
                     new LessonDTO { Title = "Refined Introduction", Description = "Updated overview with new focus." },
@@ -203,6 +205,42 @@ namespace OpenEdAI.API.Controllers
             };
 
             return Ok(adjustedPlan);
+        }
+
+        // POST: ai/SubmitCoursePlan
+        [HttpPost("submit-course")]
+        public async Task<IActionResult> SubmitCoursePlan([FromBody] SubmittedCourseDTO plan)
+        {
+            var userId = GetUserIdFromToken();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("User ID not found in token.");
+            }
+
+            // Retrieve the student to update HasCompletedSetup
+            var student = await _context.Students.FirstOrDefaultAsync(s => s.UserID == userId);
+            if (student == null)
+            {
+                return NotFound("Student not found.");
+            }
+
+            // If this is the student's first time setting up their profile and creating a course,
+            // update their status
+            if (!student.HasCompletedSetup)
+            {
+                student.MarkSetupComplete();
+            }
+            
+            // Validate the course plan
+            if (plan == null || string.IsNullOrWhiteSpace(plan.Title) || plan.Lessons == null || !plan.Lessons.Any())
+            {
+                return BadRequest("Invalid course plan.");
+            }
+
+            // TODO: Send the course plan to the search APIs to generate content links
+
+            await _context.SaveChangesAsync();
+            return Ok(new {message = "Course finalized successfully."});
         }
 
         private string BuildAdjustmentPrompt(string previousPlanJson, string userMessage, StudentProfile profile)
@@ -247,8 +285,9 @@ namespace OpenEdAI.API.Controllers
             builder.AppendLine("- Additional Info: " + profile.AdditionalConsiderations);
 
             builder.AppendLine();
+            builder.AppendLine("Generate a description for the course to be used in the JSON as well as 'tags' to be for searching for the course and lessons.");
             builder.AppendLine("Respond strictly in the following JSON format:");
-            builder.AppendLine("{ \"title\": \"Course Title\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"], \"lessons\": [ { \"title\": \"Lesson 1 Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"] }, ... ] }");
+            builder.AppendLine("{ \"title\": \"Course Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"], \"lessons\": [ { \"title\": \"Lesson 1 Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"] }, ... ] }");
             builder.AppendLine();
             builder.AppendLine("If the topic includes any inappropriate, hateful, or offensive language, respond with a warning message and do not generate a course plan.");
             builder.AppendLine("Avoid any explicit, harmful, illegal, or discriminatory content. If unsure, respond with a warning message and decline to generate a course plan.");
