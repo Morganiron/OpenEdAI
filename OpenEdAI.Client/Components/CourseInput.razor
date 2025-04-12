@@ -1,15 +1,17 @@
 ﻿@using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Services
 @using System.ComponentModel.DataAnnotations
+@inject CoursePersonalizationState PersonalizationState
 
-<EditForm Model="@model" OnValidSubmit="Submit" class="course-input-form">
+<EditForm Model="@PersonalizationState.Input" OnValidSubmit="Submit" class="course-input-form">
 	<DataAnnotationsValidator />
 	<ValidationSummary />
 
 	<label>Topic:</label>
-	<InputText @bind-Value="model.Topic" class="form-control" />
+	<InputText @bind-Value="PersonalizationState.Input.Topic" class="form-control" />
 
 	<label>Experience Level:</label>
-	<InputSelect @bind-Value="model.ExperienceLevel" class="form-control">
+	<InputSelect @bind-Value="PersonalizationState.Input.ExperienceLevel" class="form-control">
 		<option value="">Select</option>
 		<option value="Beginner">Beginner</option>
 		<option value="Intermediate">Intermediate</option>
@@ -17,21 +19,21 @@
 	</InputSelect>
 
 	<label>Additional Context:</label>
-	<InputTextArea @bind-Value="model.AdditionalContext" class="form-control" placeholder="(Optional) Additional information to help generate the best plan."/>
+	<InputTextArea @bind-Value="PersonalizationState.Input.AdditionalContext" class="form-control" placeholder="(Optional) Additional information to help generate the best plan." />
 
 	<button type="submit" class="btn btn-primary">Generate Course</button>
 
 </EditForm>
 
 @code {
-	private CoursePersonalizationInput model = new();
 	[Parameter] public EventCallback<CoursePersonalizationInput> OnGenerate { get; set; }
 
 	private async Task Submit()
 	{
 		if (OnGenerate.HasDelegate)
 		{
-			await OnGenerate.InvokeAsync(model);
+			await OnGenerate.InvokeAsync(PersonalizationState.Input);
+			await PersonalizationState.SaveStateAsync(); // Persist to localStorate
 		}
 	}
 }

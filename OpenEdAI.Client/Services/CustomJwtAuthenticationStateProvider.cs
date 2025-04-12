@@ -13,6 +13,9 @@ namespace OpenEdAI.Client.Services
         private readonly TokenManager _tokenManager;
         private readonly NavigationManager _navigation;
 
+        // String to store the previous token to detect changes
+        private string? _previousToken;
+
         public CustomJwtAuthenticationStateProvider(IJSRuntime js, TokenManager tokenManager, NavigationManager navigation, AuthConfig authConfig)
         {
             _js = js;
@@ -20,10 +23,16 @@ namespace OpenEdAI.Client.Services
             _navigation = navigation;
 
             // Subscribe to token chaanges
-            _tokenManager.OnTokenChanged += () =>
+            _tokenManager.OnTokenChanged += async () =>
             {
-                Console.WriteLine("[CustomJwtAuthStateProvider] Token changed, notifying auth state changed");
-                NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+                var token = await _js.InvokeAsync<string>("localStorage.getItem", "access_token");
+
+                if (token != _previousToken)
+                {
+                    Console.WriteLine("[CustomJwtAuthStateProvider] Token changed, notifying auth state changed.");
+                    _previousToken = token;
+                    NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+                }
             };
 
             // Subscribe to token refresh failures
@@ -72,8 +81,19 @@ namespace OpenEdAI.Client.Services
                     jwt = handler.ReadJwtToken(token);
                 }
 
+                // Skip re-parsing and avoid unnecessary state changes if the token hasn't changed
+                if (_previousToken == token)
+                {
+                    Console.WriteLine("[CustomJwtAuthStateProvider] Token has not changed, skipping update.");
+                    var cachedClaims = new ClaimsIdentity(ParseClaims(token), "cognito-jwt");
+                    return new AuthenticationState(new ClaimsPrincipal(cachedClaims));
+                }
+
                 var identity = new ClaimsIdentity(jwt.Claims, "cognito-jwt");
                 var user = new ClaimsPrincipal(identity);
+                
+                // Cache the current token for change detection
+                _previousToken = token;
                 return new AuthenticationState(user);
             }
             catch (Exception ex)
@@ -90,6 +110,14 @@ namespace OpenEdAI.Client.Services
         public void NotifyUserAuthenticationChanged()
         {
             NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+        }
+
+        // Extract claims manually for cache reuse
+        private IEnumerable<Claim> ParseClaims(string jwt)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var token = handler.ReadJwtToken(jwt);
+            return token.Claims;
         }
     }
 }

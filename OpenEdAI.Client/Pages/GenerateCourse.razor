@@ -21,6 +21,8 @@
 		Welcome to the Course Generator! Based on your preferences, we'll use AI to create a personalized course outline!
 	</p>
 
+	
+
 	@if (generatedPlan != null)
 	{
 		<CoursePlanDisplay Plan="generatedPlan" IsFinalized="@isFinalized" />
@@ -42,6 +44,16 @@
 	private List<CoursePlanChat.ChatMessage> chatMessages = new();
 	private bool isLoggingOut = false;
 
+	// Constant strings for local storage keys to persist data
+	private const string PlanStorageKey = "cached_generated_plan";
+	private const string ChatMessagesKey = "cached_chat_messages";
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadGeneratedPlanAsync();
+		await LoadChatMessagesAsync();
+	}
+
 	private async Task HandleCourseInput(CoursePersonalizationInput input)
 	{
 		try
@@ -54,6 +66,9 @@
 			{
 				generatedPlan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
 				chatMessages.Clear();
+
+				// Save the new course plan in local storage
+				await SaveGeneratedPlanAsync();
 			}
 			else
 			{
@@ -131,6 +146,10 @@
 							Text = "Course plan updated based on your request.",
 							IsUser = false
 						});
+
+					// Save updated Plan and ChateMessages to local storage
+					await SaveGeneratedPlanAsync();
+					await SaveChatMessagesAsync();
 				}
 				else
 				{
@@ -204,9 +223,55 @@
 		}
 		finally
 		{
-			
-			
+
+
 			Loader.Hide();
+		}
+	}
+	// Method to save the generated plan to local storage
+	private async Task SaveGeneratedPlanAsync()
+	{
+		if (generatedPlan != null)
+		{
+			// Serialize the generated plan to a JSON string
+			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
+			await JS.InvokeVoidAsync("localStorage.setItem", PlanStorageKey, serializedPlan);
+		}
+	}
+	// Method to load the generated plan from local storage
+	private async Task LoadGeneratedPlanAsync()
+	{
+		var serializedPlan = await JS.InvokeAsync<string>("localStorage.getItem", PlanStorageKey);
+		if (!string.IsNullOrEmpty(serializedPlan))
+		{
+			// Deserialize the JSON string back into a CoursePlanDTO object
+			generatedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(serializedPlan, new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true
+				}) ?? new();
+		}
+	}
+	// Method to save chat messages to local storage
+	private async Task SaveChatMessagesAsync()
+	{
+		if (chatMessages != null)
+		{
+			// Serialize the chat messages to a JSON string
+			var serializedMessages = JsonSerializer.Serialize(chatMessages);
+			await JS.InvokeVoidAsync("localStorage.setItem", ChatMessagesKey, serializedMessages);
+		}
+	}
+	// Method to load chat messages from local storage
+	private async Task LoadChatMessagesAsync()
+	{
+		var serializedMessages = await JS.InvokeAsync<string>("localStorage.getItem", ChatMessagesKey);
+		if (!string.IsNullOrEmpty(serializedMessages))
+		{
+			// Deserialize the JSON string back into a list of ChatMessage objects
+			chatMessages = JsonSerializer.Deserialize<List<CoursePlanChat.ChatMessage>>(serializedMessages, new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true
+				}) ?? new();
 		}
 	}
 }

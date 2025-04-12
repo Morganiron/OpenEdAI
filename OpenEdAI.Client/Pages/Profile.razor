@@ -10,7 +10,9 @@
 @inject LoadingService Loader
 @inject StudentService StudentService
 @inject LogoutService LogoutService
+@inject StudentProfileState StudentProfileState
 @inject IJSRuntime JS
+@inject TokenManager TokenManager
 
 <!-- Prevent navigation if required fields are not completed -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -18,6 +20,8 @@
 <div class="profile-container">
 
     <h3>Your Profile</h3>
+
+    <button @onclick="RefreshToken">Trigger Refresh Token</button>
 
     @if (isLoading)
     {
@@ -52,7 +56,7 @@
             <!-- Education Level as a dropdown -->
             <div class="mb-3">
                 <label class="form-label">Education Level:</label>
-                <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select">
+                <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select" @onchange="async (_) => await StudentProfileState.SaveStateAsync()">
                     <option value="">Select your education level</option>
                     @foreach (var level in availableEducationLevels)
                     {
@@ -118,7 +122,7 @@
                 else
                 {
                     <InputTextArea @bind-Value="profileModel.AdditionalConsiderations" class="form-control"
-                    placeholder="@GetDefaultAdditionalPrompt()" />
+                    placeholder="@GetDefaultAdditionalPrompt()" @bind-Value:event="oninput" ValueChanged="async (_) => await StudentProfileState.SaveStateAsync()"/>
                     <button type="button" class="btn btn-secondary mt-1" @onclick="() => isEditingAdditionalConsiderations = false">Cancel</button>
                 }
             </div>
@@ -134,7 +138,7 @@
     private string errorMessage = string.Empty;
     private ProfileModel profileModel = new ProfileModel();
     private EditContext editContext;
-	private bool isLoggingOut = false;
+    private bool isLoggingOut = false;
 
     // Editing flags for each field
     private bool isEditingAdditionalConsiderations = false;
@@ -153,6 +157,11 @@
     // Default prompt text for Additional Considerations field
     private readonly string educationOtherDefault = "Education(Other): Please enter your education";
     private readonly string specialOtherDefault = "Special Considerations(Other): Please enter your special circumstance";
+
+    private async void RefreshToken()
+    {
+        await TokenManager.RefreshTokenAsync();
+    }
 
     // Method to build the default prompt(s) based on the current selections
     private string GetDefaultAdditionalPrompt()
@@ -175,38 +184,46 @@
         Loader.Show();
         try
         {
-            Console.WriteLine("Attempting to get current student");
+            await StudentProfileState.LoadStateAsync();
+            // Get current student
             var student = await StudentService.GetCurrentStudentAsync();
-            Console.WriteLine($"Current student on profile page: {student.Username}");
+            var local = StudentProfileState.ProfileDTO;
+            var remote = student.Profile ?? new StudentProfileDTO();
 
-            // Load profileModel
-            profileModel.Username = student.Username;
-            var profile = student.Profile;
-            if (profile != null)
+            // Set dto to local if it has changes, otherwise use remote 
+            if (local is not null && !AreProfilesEqual(local, remote))
             {
-                profileModel.EducationLevel = profile.EducationLevel;
-                profileModel.PreferredContentTypes = profile.PreferredContentTypes;
-                profileModel.SpecialConsiderations = profile.SpecialConsiderations;
-                profileModel.AdditionalConsiderations = profile.AdditionalConsiderations;
+                StudentProfileState.ProfileDTO = local;
             }
             else
             {
-                profileModel = new ProfileModel { Username = student.Username };
+				StudentProfileState.ProfileDTO = remote;
+				await StudentProfileState.SaveStateAsync();
             }
+
+			// Set the DTO to the most up-to-date profile
+			var dto = StudentProfileState.ProfileDTO;
+            
+            // Load profileModel
+            profileModel = new ProfileModel
+            {
+                Username = student.Username,
+                EducationLevel = dto.EducationLevel,
+                PreferredContentTypes = dto.PreferredContentTypes,
+                SpecialConsiderations = dto.SpecialConsiderations,
+                AdditionalConsiderations = dto.AdditionalConsiderations
+            };
 
             editContext = new EditContext(profileModel);
 
             foreach (var type in availableContentTypes)
             {
-                contentTypeSelections[type] = !string.IsNullOrEmpty(profileModel.PreferredContentTypes) &&
-                    profileModel.PreferredContentTypes.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(x => x.Trim())
-                        .Contains(type);
+                contentTypeSelections[type] = profileModel.PreferredContentTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(type) ?? false;
             }
 
             foreach (var option in availableSpecialConsiderations)
             {
-                specialConsiderationSelections[option] = false;
+                specialConsiderationSelections[option] = profileModel.SpecialConsiderations?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(option) ?? false;
             }
             if (!string.IsNullOrEmpty(profileModel.SpecialConsiderations))
             {
@@ -217,6 +234,7 @@
                     specialConsiderationSelections[option] = selectedOptions.Contains(option);
                 }
             }
+            await StudentProfileState.SaveStateAsync();
         }
         catch (Exception ex)
         {
@@ -229,7 +247,15 @@
         }
     }
 
-    private void OnPreferredContentTypesChanged(string type, bool newValue)
+	private static bool AreProfilesEqual(StudentProfileDTO local, StudentProfileDTO remote)
+	{
+		return local.EducationLevel == remote.EducationLevel &&
+						local.PreferredContentTypes == remote.PreferredContentTypes &&
+						local.SpecialConsiderations == remote.SpecialConsiderations &&
+						local.AdditionalConsiderations == remote.AdditionalConsiderations;
+	}
+
+    private async Task OnPreferredContentTypesChanged(string type, bool newValue)
     {
         // Update the dictionary for whichever checkbox changed.
         contentTypeSelections[type] = newValue;
@@ -243,10 +269,13 @@
 
         // Update validation
         editContext.NotifyValidationStateChanged();
+
+        // Save the state to local storage
+        await StudentProfileState.SaveStateAsync();
         StateHasChanged();
     }
 
-    private void OnSpecialConsiderationsChanged(string option, bool newValue)
+    private async Task OnSpecialConsiderationsChanged(string option, bool newValue)
     {
         // Update the dictionary for whichever checkbox changed.
         specialConsiderationSelections[option] = newValue;
@@ -262,7 +291,8 @@
         editContext.NotifyValidationStateChanged();
 
         Console.WriteLine($"Special Consideration changed: {profileModel.SpecialConsiderations}");
-
+        // Save the state to local storage
+        await StudentProfileState.SaveStateAsync();
         StateHasChanged();
     }
 
@@ -314,6 +344,8 @@
             profileModel.SpecialConsiderations = string.Join(", ", selectedSpecial);
 
             await StudentService.UpdateStudentProfileAsync(profileModel.ToUpdateDTO());
+            StudentProfileState.ProfileDTO = profileModel.ToUpdateDTO().Profile;
+            await StudentProfileState.SaveStateAsync();
 
             Navigation.NavigateTo("/generate-course", replace: true);
         }
