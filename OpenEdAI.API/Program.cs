@@ -1,34 +1,48 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Amazon.Extensions.NETCore.Setup;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using Amazon.CognitoIdentityProvider;
 using OpenEdAI.API.Data;
-using Microsoft.AspNetCore.Mvc;
+using OpenEdAI.API.Services;
+using Amazon.Extensions.NETCore.Setup;
+using Amazon;
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Model;
+using Amazon.CognitoIdentityProvider;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load configurations
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    // Load user secrets only in development
-    .AddUserSecrets<Program>();
+// Register AWSSecretsManagerService to DI container
+builder.Services.AddSingleton<AWSSecretsManagerService>();
 
+// Load configurations from appsettings.json, appsettings.Development.json, user secrets and environment variables
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddUserSecrets<Program>()
+    .AddEnvironmentVariables();
+
+// Retrieve the HTTPS configuration from User Secrets (or other configuration sources)
+var httpsConfig = builder.Configuration.GetSection("Https");
+var certPath = httpsConfig.GetValue<string>("CertificatePath");
+var certPassword = httpsConfig.GetValue<string>("CertificatePassword");
+
+// Configure Kestrel to listen on port 80 for HTTP and 443 for HTTPS (using certificate from configuration)
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.ListenAnyIP(80); // Always allow HTTP for internal/ALB
 
-    // Always listen on 443 with HTTPS regardless of environment
+    // Listen on 443 with HTTPS using the certificate path and password
     serverOptions.ListenAnyIP(443, listenOptions =>
     {
-        listenOptions.UseHttps("/https/aspnetapp.pfx", "devcertpass");
+            listenOptions.UseHttps(certPath, certPassword);
     });
-    
-    
 });
 
 // Add CORS service 
@@ -36,22 +50,46 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontendDev", policy =>
     {
-        policy.WithOrigins("http://localhost:5239", "https://localhost:7043") // frontend dev port
+        policy.WithOrigins("http://localhost:5239", "https://localhost:7043")
         .AllowAnyHeader()
         .AllowAnyMethod();
     });
 });
 
+// Conditionally load secrets from AWS Secrets Manager in not in Development. (hosted on AWS)
+if (!builder.Environment.IsDevelopment())
+{
+    Console.WriteLine("Non-development environment detected. Loading secrets from AWS Secrets Manager...");
+    var secretsManagerService = builder.Services.BuildServiceProvider().GetRequiredService<AWSSecretsManagerService>();
+
+    // Retrieve app secrets (ClientSecret, DefaultConnection, etc.)
+    var appSecrets = await secretsManagerService.GetAppSecretsAsync();
+    // Add secrets to configuration
+    foreach (var secret in appSecrets)
+    {
+        builder.Configuration[secret.Key] = secret.Value;
+    }
+    // Retrieve OpenAI key
+var openAiKey = await secretsManagerService.GetOpenAiKeyAsync();
+    builder.Configuration["OpenAi_LearningPathKey"] = openAiKey;
+
+}
+else
+{
+    // In development, the configuration values are expected to be present
+    // in appsettings.Development.json, user secrets, or environment variables
+    Console.WriteLine("Development mode detected - skipping AWS Secrets Manager integration.");
+}
 // Get the connection string for the database
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrEmpty(connectionString))
 {
-    throw new InvalidOperationException("Database connection string is missing. Please set 'ConnectionStrings__DefaultConnection' in environment variables.");
+    throw new InvalidOperationException("Database connection string is missing.");
 }
 
-// Add services to the container.
+// Add application services
 builder.Services.AddControllers();
 builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
 builder.Services.AddHttpClient();
@@ -61,6 +99,8 @@ JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 // Configure AWS options
 builder.Services.Configure<AWSOptions>(builder.Configuration.GetSection("AWS"));
+
+// Retrieve AWS Cognito settings from environment variables or configuration
 var userPoolId = Environment.GetEnvironmentVariable("AWS:Cognito:UserPoolId")
                  ?? builder.Configuration.GetValue<string>("AWS:Cognito:UserPoolId");
 
@@ -98,13 +138,13 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-
+// Ensure AWS Cognito settings are provided
 if (string.IsNullOrEmpty(userPoolId) || string.IsNullOrEmpty(appClientId))
 {
-    throw new InvalidOperationException("AWS Cognito settings are missing. Please configure them in user-secrets.");
+    throw new InvalidOperationException("AWS Cognito settings are missing. Please configure.");
 }
 
-// Cognito Authority
+// Cognito Authority URL
 var cognitoAuthority = $"https://cognito-idp.{awsRegion}.amazonaws.com/{userPoolId}";
 
 // Register Database Context with MySQL
@@ -115,7 +155,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     )
 );
 
-// Optimize Token Validation with Caching
+// Retireve teh OpenID Connect configuration from Cognito for token validation
 var configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
     $"{cognitoAuthority}/.well-known/openid-configuration",
     new OpenIdConnectConfigurationRetriever(),
@@ -125,7 +165,7 @@ var configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
 var openIdConfig = configurationManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
 var signingKeys = openIdConfig.SigningKeys;
 
-// Configure Authentication with Cognito JWT Tokens
+// Configure authentication using JWT Bearer tokens, including custom validation for client_id
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -136,24 +176,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuer = true,
             ValidIssuer = cognitoAuthority,
-
             ValidateAudience = false,
-
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = signingKeys,
-
-            // Set the claim types which will be used to map the claims from the JWT token to the ClaimsPrincipal
             NameClaimType = "username",
             RoleClaimType = "cognito:groups"
 
         };
-        // Add custom validation logic to check the client_id
+        
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
             {
-                // Retrieve the client_id from the principal
+                // Retrieve the client_id from the token and compare it with expected value
                 var tokenClientId = context.Principal.FindFirst("client_id")?.Value;
 
                 if (string.IsNullOrWhiteSpace(tokenClientId) || tokenClientId.Trim() != appClientId.Trim())
@@ -166,10 +202,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
     });
 
-
+// Add authorization service
 builder.Services.AddAuthorization();
 
-// Register Swagger generator with JWT support
+// Register Swagger with JWT support
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "OpenEdAI API", Version = "v1" });
@@ -203,21 +239,16 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
-
+// Enable Swagger for all environments
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-// Enable authentication & authorization middleware
+// Enable CORS
 app.UseCors("AllowFrontendDev");
 
-//debug
+// Debug middleware to log request paths and authentication state.
 app.Use(async (context, next) =>
 {
     Console.WriteLine($"Request Path: {context.Request.Path}, Authenticated: {context.User?.Identity?.IsAuthenticated}");
