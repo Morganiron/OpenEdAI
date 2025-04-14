@@ -36,12 +36,12 @@ var certPassword = httpsConfig.GetValue<string>("CertificatePassword");
 // Configure Kestrel to listen on port 80 for HTTP and 443 for HTTPS (using certificate from configuration)
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.ListenAnyIP(80); // Always allow HTTP for internal/ALB
+    serverOptions.ListenAnyIP(5070); // Always allow HTTP for internal/ALB
 
     // Listen on 443 with HTTPS using the certificate path and password
-    serverOptions.ListenAnyIP(443, listenOptions =>
+    serverOptions.ListenAnyIP(7148, listenOptions =>
     {
-            listenOptions.UseHttps(certPath, certPassword);
+        listenOptions.UseHttps(certPath, certPassword);
     });
 });
 
