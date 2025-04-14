@@ -21,7 +21,7 @@
 		Welcome to the Course Generator! Based on your preferences, we'll use AI to create a personalized course outline!
 	</p>
 
-	
+
 
 	@if (generatedPlan != null)
 	{
@@ -47,6 +47,9 @@
 	// Constant strings for local storage keys to persist data
 	private const string PlanStorageKey = "cached_generated_plan";
 	private const string ChatMessagesKey = "cached_chat_messages";
+
+	// Expiration time in hours (to remove stored items when returning to the page)
+	private const int StorageExpiration = 2;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -208,6 +211,10 @@
 
 				// TODO: Add logic to send data to the backend for processing
 
+				// Clear the localstorage to no longer persist the input information
+				await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
+				await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+
 				// Redirect to dashboard
 				Navigation.NavigateTo("/dashboard");
 			}
@@ -233,22 +240,51 @@
 	{
 		if (generatedPlan != null)
 		{
+			var wrapper = new
+			{
+				Data = generatedPlan,
+				Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+			};
+
 			// Serialize the generated plan to a JSON string
-			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
-			await JS.InvokeVoidAsync("localStorage.setItem", PlanStorageKey, serializedPlan);
+			var serialized = JsonSerializer.Serialize(wrapper);
+			await JS.InvokeVoidAsync("localStorage.setItem", PlanStorageKey, serialized);
 		}
 	}
 	// Method to load the generated plan from local storage
 	private async Task LoadGeneratedPlanAsync()
 	{
-		var serializedPlan = await JS.InvokeAsync<string>("localStorage.getItem", PlanStorageKey);
-		if (!string.IsNullOrEmpty(serializedPlan))
+		var serialized = await JS.InvokeAsync<string>("localStorage.getItem", PlanStorageKey);
+
+		if (!string.IsNullOrEmpty(serialized))
 		{
-			// Deserialize the JSON string back into a CoursePlanDTO object
-			generatedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(serializedPlan, new JsonSerializerOptions
+			try
+			{
+				var wrapper = JsonSerializer.Deserialize<JsonElement>(serialized);
+				if (wrapper.ValueKind == JsonValueKind.Object &&
+					wrapper.TryGetProperty("Timestamp", out var timestampProp) &&
+					wrapper.TryGetProperty("Data", out var dataProp))
 				{
-					PropertyNameCaseInsensitive = true
-				}) ?? new();
+					var timestamp = timestampProp.GetInt64();
+					var age = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - timestamp;
+					if (age < StorageExpiration * 60 * 60 * 1000)
+					{
+						generatedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(dataProp.GetRawText(), new JsonSerializerOptions
+							{
+								PropertyNameCaseInsensitive = true
+							});
+						return;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Invalid plan format or exception: {ex.Message}");
+			}
+
+			// If any of the above fails, clear the old storage
+			await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
+
 		}
 	}
 	// Method to save chat messages to local storage
@@ -256,22 +292,50 @@
 	{
 		if (chatMessages != null)
 		{
-			// Serialize the chat messages to a JSON string
-			var serializedMessages = JsonSerializer.Serialize(chatMessages);
-			await JS.InvokeVoidAsync("localStorage.setItem", ChatMessagesKey, serializedMessages);
+			var wrapper = new
+			{
+				Data = chatMessages,
+				Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+			};
+
+			// Serialize the generated plan to a JSON string
+			var serialized = JsonSerializer.Serialize(wrapper);
+			await JS.InvokeVoidAsync("localStorage.setItem", ChatMessagesKey, serialized);
 		}
 	}
 	// Method to load chat messages from local storage
 	private async Task LoadChatMessagesAsync()
 	{
-		var serializedMessages = await JS.InvokeAsync<string>("localStorage.getItem", ChatMessagesKey);
-		if (!string.IsNullOrEmpty(serializedMessages))
+		var serialized = await JS.InvokeAsync<string>("localStorage.getItem", ChatMessagesKey);
+
+		if (!string.IsNullOrEmpty(serialized))
 		{
-			// Deserialize the JSON string back into a list of ChatMessage objects
-			chatMessages = JsonSerializer.Deserialize<List<CoursePlanChat.ChatMessage>>(serializedMessages, new JsonSerializerOptions
+			try
+			{
+				var wrapper = JsonSerializer.Deserialize<JsonElement>(serialized);
+				if (wrapper.ValueKind == JsonValueKind.Object &&
+					wrapper.TryGetProperty("Timestamp", out var timestampProp) &&
+					wrapper.TryGetProperty("Data", out var dataProp))
 				{
-					PropertyNameCaseInsensitive = true
-				}) ?? new();
+					var timestamp = timestampProp.GetInt64();
+					var age = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - timestamp;
+					if (age < StorageExpiration * 60 * 60 * 1000)
+					{
+						chatMessages = JsonSerializer.Deserialize<List<CoursePlanChat.ChatMessage>>(dataProp.GetRawText(), new JsonSerializerOptions
+							{
+								PropertyNameCaseInsensitive = true
+							});
+						return;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Invalid chat format or exception: {ex.Message}");
+			}
+
+			// Clear legacy or corrupted data
+			await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
 		}
 	}
 }
