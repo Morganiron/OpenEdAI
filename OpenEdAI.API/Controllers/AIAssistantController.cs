@@ -1,11 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
 using System.Text.Json;
 using System.Text;
 using Microsoft.Identity.Client;
+using OpenAI;
+using OpenAI.Chat;
+using OpenAI.Models;
+using System.Numerics;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -15,14 +20,21 @@ namespace OpenEdAI.API.Controllers
     public class AIAssistantController : BaseController
     {
         private readonly ApplicationDbContext _context;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
+        private readonly OpenAIClient _openAiClient;
 
-        public AIAssistantController(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public AIAssistantController(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
+
+            // Retrieve the API key from configuration
+            var apiKey = configuration["OpenAi:LearningPathKey"];
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                throw new InvalidOperationException("OpenAI API key is not configured");
+            }
+
+            // Initialize the OpenAI client
+            _openAiClient = new OpenAIClient(new OpenAIAuthentication(apiKey));
         }
 
         // POST: ai/GenerateCourse
@@ -43,56 +55,99 @@ namespace OpenEdAI.API.Controllers
             {
                 return BadRequest("User profile not found.");
             }
-            // Commented out to return Mocked response until AI integration is complete
-            //var prompt = BuildPrompt(input, profile);
 
-            //var client = _httpClientFactory.CreateClient();
-            //client.BaseAddress = new Uri("https://api.openai.com/v1/");
-            //client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_configuration["OpenAI:ApiKey"]}");
+            // Build the prompt using the user's input and profile
+            var prompt = BuildPrompt(input, profile);
+            Console.WriteLine("Generated propmt:");
+            Console.WriteLine(prompt);
 
-            //var requestBody = new
+            ChatResponse chatResponse;
+            try
+            {
+                // Create a ChatRequest with a single system & user message.
+                var messages = new[]
+                {
+                    new Message(Role.System, "You are a helpful and inclusive AI course planner. " +
+                                               "Your job is to generate structured course outlines based on user input and personal learning profiles. " +
+                                               "Respond only in clean, valid JSON format and strictly follow the structure provided. " +
+                                               "DO NOT include any additional commentary. " +
+                                               "When generating lesson tags and descriptions, make them optimized for search engines — use keywords someone might type into YouTube or Google when looking to learn that lesson. " +
+                                               "Try to infer how someone with this learner's background would phrase their search queries, and reflect that in the tags and lesson titles. " +
+                                               "If the topic is offensive, inappropriate, or too broad, return a JSON warning message instead."),
+                    new Message(Role.User, prompt)
+                };
+                // Create a new ChatRequest using the specified messages, telling the system which model to use and set the randomness of the generated output
+                // 0.7 is a balanced output between a deterministic and creative resonse.
+                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.7);
+                // Call the ChatEndpoint asynchronously
+                chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling OpenAI API: {ex.Message}");
+                return StatusCode(500, ex.Message);
+            }
+
+            if (chatResponse?.Choices == null || chatResponse.Choices.Count == 0)
+            {
+                return StatusCode(500, "No output received from OpenAI API.");
+            }
+
+            string coursePlanJson = chatResponse.Choices[0].Message.Content;
+            Console.WriteLine("Raw AI-generated output:");
+            Console.WriteLine(coursePlanJson);
+
+            CoursePlanDTO coursePlan;
+            try
+            {
+                coursePlan = JsonSerializer.Deserialize<CoursePlanDTO>(
+                    coursePlanJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+                // Validate that deserialization produced required fields
+                if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) ||
+                    coursePlan.Lessons == null || !coursePlan.Lessons.Any())
+                {
+                    throw new JsonException("Missing required fields in CoursePlanDTO.");
+                }
+                return Ok(coursePlan);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"Deserialization error: {ex.Message}");
+
+                // Create a fallback warning CoursePlanDTO so that the front-end chat always has something to display
+                coursePlan = new CoursePlanDTO
+                {
+                    Title = "Warning: Course Plan Issue",
+                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{coursePlanJson}",
+                    Lessons = new List<LessonDTO>()
+                };
+            }
+
+            return Ok(coursePlan);
+
+            // Temporarily mock resonse
+            //var mockPlan = new CoursePlanDTO
             //{
-            //    model = "gpt-4",
-            //    messages = new[]
+            //    Title = input.Topic,
+            //    Description = "AI generated course description",
+            //    Lessons = new List<LessonDTO>
             //    {
-            //        new {role = "system", content = "You are a helpful course planner."},
-            //        new {role = "user", content = prompt }
+            //        new LessonDTO
+            //        {
+            //            Title = "Introduction",
+            //            Description = "Overview of the Course"
+            //        },
+            //        new LessonDTO
+            //        {
+            //            Title = "Lesson 1",
+            //            Description = "Basics of the topic."
+            //        }
             //    }
             //};
 
-            //var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            //var response = await client.PostAsync("chat/completions", content);
-
-            //if (!response.IsSuccessStatusCode)
-            //{
-            //    var error = await response.Content.ReadAsStringAsync();
-            //    return StatusCode((int)response.StatusCode, error);
-            //}
-
-            //var json = await response.Content.ReadAsStringAsync();
-            // TODO: Parse the response and construct a CoursePlanDTO from it
-
-            // Temporarily mock resonse
-            var mockPlan = new CoursePlanDTO
-            {
-                Title = input.Topic,
-                Description = "AI generated course description",
-                Lessons = new List<LessonDTO>
-                {
-                    new LessonDTO
-                    {
-                        Title = "Introduction",
-                        Description = "Overview of the Course"
-                    },
-                    new LessonDTO
-                    {
-                        Title = "Lesson 1",
-                        Description = "Basics of the topic."
-                    }
-                }
-            };
-
-            return Ok(mockPlan);
+            //return Ok(coursePlanJson);
         }
 
         // POST: ai/AdjustCourse
@@ -106,28 +161,29 @@ namespace OpenEdAI.API.Controllers
                 return Unauthorized("User ID not found in token.");
             }
 
+            // Log received payload properties for debugging
             Console.WriteLine("Received payload:");
             foreach (var prop in payload.EnumerateObject())
             {
                 Console.WriteLine($"Property: {prop.Name}");
             }
 
-            // Gracefully handle missing properties
+            // Validate required fields exist
             if (!payload.TryGetProperty("userMessage", out JsonElement userMessageElement) ||
                 !payload.TryGetProperty("previousPlan", out JsonElement previousPlanElement))
             {
                 return BadRequest("Missing required fields: UserMessage and/or PreviousPlan.");
             }
 
-            var userMessage = userMessageElement.GetString();
-            var previousPlanJson = previousPlanElement.GetString();
+            string userMessage = userMessageElement.GetString();
+            string previousPlanJson = previousPlanElement.GetString();
 
             if (string.IsNullOrWhiteSpace(userMessage) || string.IsNullOrWhiteSpace(previousPlanJson))
             {
                 return BadRequest("UserMessage and PreviousPlan must not be empty.");
             }
 
-            // Deserialize previous plan
+            // Deserialize previous course plan
             CoursePlanDTO previousPlan;
             try
             {
@@ -140,71 +196,97 @@ namespace OpenEdAI.API.Controllers
             {
                 return BadRequest("Failed to deserialize previous plan: " + ex.Message);
             }
-
+            
+            // Retrieve the user's profile
             var profile = await _context.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null)
             {
                 return BadRequest("User profile not found.");
             }
-            
-            // Commented out to return Mocked response until AI integration is complete
-            //var prompt = BuildAdjustmentPrompt(previousPlanJson, userMessage, profile);
 
-            //var client = _httpClientFactory.CreateClient();
-            //client.BaseAddress = new Uri("https://api.openai.com/v1/");
-            //client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_configuration["OpenAI:ApiKey"]}");
+            // Build the adjustment prompt
+            var prompt = BuildAdjustmentPrompt(previousPlanJson, userMessage, profile);
+            Console.WriteLine("Adjustment prompt:");
+            Console.WriteLine(prompt);
 
-            //var requestBody = new
+            ChatResponse chatResponse;
+            try
+            {
+                // Create messages for the adjustment request:
+                var messages = new[]
+                {
+                    new Message(Role.System, "You are a helpful and inclusive AI course planner. " +
+                        "Your job is to adjust an existing course plan based on user feedback. " +
+                        "Respond only in clean, valid JSON format and strictly follow the provided structure. " +
+                        "Do not include any additional commentary. " +
+                        "If the adjustment request is unclear or the topic is inappropriate, return a JSON warning message instead."),
+                    new Message(Role.User, prompt)
+                };
+
+                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.7);
+                chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling OpenAI API for adjustment: {ex.Message}");
+                return StatusCode(500, ex.Message);
+            }
+
+            if (chatResponse?.Choices == null || chatResponse.Choices.Count == 0)
+            {
+                return StatusCode(500, "No output received from OpenAI API.");
+            }
+
+            // Extract the raw AI-generated output
+            string adjustedPlanJson = chatResponse.Choices[0].Message.Content;
+            Console.WriteLine("Raw AI-generated adjusted output:");
+            Console.WriteLine(adjustedPlanJson);
+
+
+            CoursePlanDTO adjustedPlan;
+            try
+            {
+                adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(
+                    adjustedPlanJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+                // Validate that deserialization produced required fields
+                if (adjustedPlan == null || string.IsNullOrWhiteSpace(adjustedPlan.Title) ||
+                    adjustedPlan.Lessons == null || !adjustedPlan.Lessons.Any())
+                {
+                    throw new JsonException("Missing required fields in CoursePlanDTO.");
+                }
+                return Ok(adjustedPlan);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"Deserialization error: {ex.Message}");
+
+                // Create a fallback warning CoursePlanDTO so that the front-end chat always has something to display
+                adjustedPlan = new CoursePlanDTO
+                {
+                    Title = "Warning: Course Plan Issue",
+                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{adjustedPlanJson}",
+                    Lessons = new List<LessonDTO>()
+                };
+            }
+
+            return Ok(adjustedPlan);
+
+            // Mocked adjusted plan
+            //var adjustedPlan = new CoursePlanDTO
             //{
-            //    model = "gpt-4",
-            //    messages = new[]
+            //    Title = "Adjusted: " + previousPlan?.Title,
+            //    Description = "AI Adjusted Generated Course Description",
+            //    Lessons = new List<LessonDTO>
             //    {
-            //        new { role = "system", content = "You are a helpful course planner. The user has an existing course plan and would like to make adjustments." },
-            //        new { role = "user", content = prompt }
+            //        new LessonDTO { Title = "Refined Introduction", Description = "Updated overview with new focus." },
+            //        new LessonDTO { Title = "Lesson 1 (Revised)", Description = "Enhanced content for better clarity." },
+            //        new LessonDTO { Title = "Lesson 2", Description = "Additional lesson based on feedback." }
             //    }
             //};
 
-            //var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            //var response = await client.PostAsync("chat/completions", content);
-
-            //if (!response.IsSuccessStatusCode)
-            //{
-            //    var error = await response.Content.ReadAsStringAsync();
-            //    return StatusCode((int)response.StatusCode, error);
-            //}
-
-            //var json = await response.Content.ReadAsStringAsync();
-            //var result = JsonDocument.Parse(json);
-            //var courseContent = result.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-
-            //try
-            //{
-            //    var coursePlan = JsonSerializer.Deserialize<CoursePlanDTO>(courseContent, new JsonSerializerOptions
-            //    {
-            //        PropertyNameCaseInsensitive = true
-            //    });
-
-            //    return Ok(coursePlan);
-            //}
-            //catch (JsonException)
-            //{
-            //    return StatusCode(500, "Failed to parse adjusted course plan from AI.");
-            //}
-
-            // Mocked adjusted plan
-            var adjustedPlan = new CoursePlanDTO
-            {
-                Title = "Adjusted: " + previousPlan?.Title,
-                Description = "AI Adjusted Generated Course Description",
-                Lessons = new List<LessonDTO>
-                {
-                    new LessonDTO { Title = "Refined Introduction", Description = "Updated overview with new focus." },
-                    new LessonDTO { Title = "Lesson 1 (Revised)", Description = "Enhanced content for better clarity." },
-                    new LessonDTO { Title = "Lesson 2", Description = "Additional lesson based on feedback." }
-                }
-            };
-
-            return Ok(adjustedPlan);
+            //return Ok(adjustedPlan);
         }
 
         // POST: ai/SubmitCoursePlan
@@ -243,56 +325,63 @@ namespace OpenEdAI.API.Controllers
             return Ok(new {message = "Course finalized successfully."});
         }
 
+        /// <summary>
+        /// Builds a prompt for adjusting an existing course plan.
+        /// </summary>
         private string BuildAdjustmentPrompt(string previousPlanJson, string userMessage, StudentProfile profile)
         {
-            var prompt = new StringBuilder();
-
-            prompt.AppendLine("Here is the current course plan in JSON format::");
-            prompt.AppendLine(previousPlanJson);
-            prompt.AppendLine("The user has provided the following message to adjust the course plan:");
-            prompt.AppendLine(userMessage);
-
-            prompt.AppendLine("Consider the following user information in regards to learning style, education level, special needs, and preferences:");
-            prompt.AppendLine("- Education Level: " + profile.EducationLevel);
-            prompt.AppendLine("- Preferred Content Types: " + profile.PreferredContentTypes);
-            prompt.AppendLine("- Special Considerations: " + profile.SpecialConsiderations);
-            prompt.AppendLine("- Additional Info: " + profile.AdditionalConsiderations);
-
-            prompt.AppendLine("\nIf the topic includes any inappropriate, hateful, or offensive language, respond with a warning message and do not generate a course plan.");
-            prompt.AppendLine("Avoid any explicit, harmful, illegal, or discriminatory content. If unsure, respond with a warning message and decline to generate a course plan.");
-            prompt.AppendLine("If the topic is too broad, ask the user to narrow it down, provide suggestions based on the topic they want to learn. Respond in a manner consistent with their Education Level and Special Considerations.");
-
-            prompt.AppendLine("\nUpdate the course plan based on the user's message and the provided information. Respond strictly in the same JSON format as the original.");
-
-            return prompt.ToString();
+            var builder = new StringBuilder();
+            builder.AppendLine("Current Course Plan (in JSON):");
+            builder.AppendLine(previousPlanJson);
+            builder.AppendLine();
+            builder.AppendLine("User Adjustment:");
+            builder.AppendLine(userMessage);
+            builder.AppendLine();
+            builder.AppendLine("Consider the following user information regarding learning style, education level, special needs, and preferences:");
+            builder.AppendLine($"- Education Level: {profile.EducationLevel}");
+            builder.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes}");
+            builder.AppendLine($"- Special Considerations: {profile.SpecialConsiderations}");
+            builder.AppendLine($"- Additional Info: {profile.AdditionalConsiderations}");
+            builder.AppendLine();
+            builder.AppendLine("Update the course plan based on the above adjustment request and provided user details.");
+            builder.AppendLine("Respond strictly in the same JSON format as the original course plan.");
+            builder.AppendLine("If the adjustment request is unclear or invalid, return a JSON warning message instead.");
+            return builder.ToString();
         }
 
+        /// <summary>
+        /// Builds the prompt for generating a course plan.
+        /// </summary>
         private string BuildPrompt(CoursePersonalizationInput input, StudentProfile profile)
         {
             var builder = new StringBuilder();
             builder.AppendLine($"Create a structured course on the topic: {input.Topic}");
             builder.AppendLine($"Experience Level: {input.ExperienceLevel}");
-
             if (!string.IsNullOrWhiteSpace(input.AdditionalContext))
             {
                 builder.AppendLine($"Additional User Context: {input.AdditionalContext}");
             }
-
-            builder.AppendLine("Consider the following user information in regards to learning style, education level, special needs, and preferences:");
-            builder.AppendLine("- Education Level: " + profile.EducationLevel);
-            builder.AppendLine("- Preferred Content Types: " + profile.PreferredContentTypes);
-            builder.AppendLine("- Special Considerations: " + profile.SpecialConsiderations);
-            builder.AppendLine("- Additional Info: " + profile.AdditionalConsiderations);
-
             builder.AppendLine();
-            builder.AppendLine("Generate a description for the course to be used in the JSON as well as 'tags' to be for searching for the course and lessons.");
+            builder.AppendLine("Consider the following user information regarding learning style, education level, special needs, and preferences:");
+            builder.AppendLine($"- Education Level: {profile.EducationLevel}");
+            builder.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes}");
+            builder.AppendLine($"- Special Considerations: {profile.SpecialConsiderations}");
+            builder.AppendLine($"- Additional Info: {profile.AdditionalConsiderations}");
+            builder.AppendLine();
+            builder.AppendLine("Generate a description for the course to be used in the JSON as well as 'tags' for searching for the course and its lessons.");
             builder.AppendLine("Respond strictly in the following JSON format:");
-            builder.AppendLine("{ \"title\": \"Course Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"], \"lessons\": [ { \"title\": \"Lesson 1 Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"] }, ... ] }");
+            builder.AppendLine("{");
+            builder.AppendLine("  \"title\": \"Course Title\",");
+            builder.AppendLine("  \"description\": \"Description\",");
+            builder.AppendLine("  \"tags\": [\"tag1\", \"tag2\", \"etc.\"],");
+            builder.AppendLine("  \"lessons\": [");
+            builder.AppendLine("    { \"title\": \"Lesson 1 Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
+            builder.AppendLine("  ]");
+            builder.AppendLine("}");
             builder.AppendLine();
-            builder.AppendLine("If the topic includes any inappropriate, hateful, or offensive language, respond with a warning message and do not generate a course plan.");
-            builder.AppendLine("Avoid any explicit, harmful, illegal, or discriminatory content. If unsure, respond with a warning message and decline to generate a course plan.");
-            builder.AppendLine("If the topic is too broad, ask the user to narrow it down, provide suggestions based on the topic they want to learn. Respond in a manner consistent with their Education Level and Special Considerations.");
-
+            builder.AppendLine("If the topic includes any inappropriate, hateful, or offensive language, return a JSON warning message instead.");
+            builder.AppendLine("Avoid explicit, harmful, illegal, or discriminatory content. If unsure, return a warning message and do not generate a course plan.");
+            builder.AppendLine("If the topic is too broad, ask the user to narrow it down or provide suggestions based on the topic. Respond in a manner consistent with the user's education level and special considerations.");
             return builder.ToString();
         }
 
