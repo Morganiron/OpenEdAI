@@ -1,12 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
 using System.Text.Json;
 using System.Text;
-using Microsoft.Identity.Client;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
@@ -16,15 +16,16 @@ namespace OpenEdAI.API.Controllers
 {
     [Route("ai")]
     [ApiController]
-    
     public class AIAssistantController : BaseController
     {
         private readonly ApplicationDbContext _context;
         private readonly OpenAIClient _openAiClient;
+        private readonly ILogger<AIAssistantController> _logger;
 
-        public AIAssistantController(ApplicationDbContext context, IConfiguration configuration)
+        public AIAssistantController(ApplicationDbContext context, IConfiguration configuration, ILogger<AIAssistantController> logger)
         {
             _context = context;
+            _logger = logger;
 
             // Retrieve the API key from configuration
             var apiKey = configuration["OpenAi:LearningPathKey"];
@@ -44,22 +45,20 @@ namespace OpenEdAI.API.Controllers
             var userId = GetUserIdFromToken();
             if (string.IsNullOrEmpty(userId))
             {
+                _logger.LogWarning("User ID not found in token.");
                 return Unauthorized("User ID not found in token.");
             }
 
             // Retrieve the user's profile to use in the AI prompt
-            var profile = await _context.StudentProfiles
-                .FirstOrDefaultAsync(p => p.UserId == userId);
-
+            var profile = await _context.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null)
             {
+                _logger.LogWarning("User profile not found for user {UserId}.", userId);
                 return BadRequest("User profile not found.");
             }
 
             // Build the prompt using the user's input and profile
             var prompt = BuildPrompt(input, profile);
-            Console.WriteLine("Generated propmt:");
-            Console.WriteLine(prompt);
 
             ChatResponse chatResponse;
             try
@@ -76,78 +75,64 @@ namespace OpenEdAI.API.Controllers
                                                "If the topic is offensive, inappropriate, or too broad, return a JSON warning message instead."),
                     new Message(Role.User, prompt)
                 };
-                // Create a new ChatRequest using the specified messages, telling the system which model to use and set the randomness of the generated output
-                // 0.7 is a balanced output between a deterministic and creative resonse.
+
+                // 0.7 is chosen for a balanced output between determinism and creativity.
                 var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.7);
                 // Call the ChatEndpoint asynchronously
                 chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error calling OpenAI API: {ex.Message}");
+                _logger.LogError(ex, "Error calling OpenAI API in GenerateCourse");
                 return StatusCode(500, ex.Message);
             }
 
             if (chatResponse?.Choices == null || chatResponse.Choices.Count == 0)
             {
+                _logger.LogError("No output received from OpenAI API in GenerateCourse.");
                 return StatusCode(500, "No output received from OpenAI API.");
             }
+            
+            // Get the response content
+            var coursePlanJson = chatResponse.Choices[0].Message.Content;
 
-            string coursePlanJson = chatResponse.Choices[0].Message.Content;
-            Console.WriteLine("Raw AI-generated output:");
-            Console.WriteLine(coursePlanJson);
+            // Get the raw text from the json element as a string
+            string fixedJson = coursePlanJson.ValueKind == JsonValueKind.String
+                ? coursePlanJson.GetString()
+                : coursePlanJson.GetRawText();
 
             CoursePlanDTO coursePlan;
             try
             {
                 coursePlan = JsonSerializer.Deserialize<CoursePlanDTO>(
-                    coursePlanJson,
+                    fixedJson,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
                 );
-                // Validate that deserialization produced required fields
+
+                // Validate deserialization produced required fields
                 if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) ||
                     coursePlan.Lessons == null || !coursePlan.Lessons.Any())
                 {
+                    _logger.LogError("Error deserializing course plan. Missing required fields. CouserPlan:\n{Output}", fixedJson);
+                    _logger.LogError("\n\ncoursePlanJson:\n{Output}", (object)coursePlanJson);
+
                     throw new JsonException("Missing required fields in CoursePlanDTO.");
                 }
                 return Ok(coursePlan);
             }
             catch (JsonException ex)
             {
-                Console.WriteLine($"Deserialization error: {ex.Message}");
-
-                // Create a fallback warning CoursePlanDTO so that the front-end chat always has something to display
+                _logger.LogError(ex, "Deserialization error in GenerateCourse. JSON Response:\n{Output}", fixedJson);
+                // Fallback warning DTO for the front-end to show in the chat component
                 coursePlan = new CoursePlanDTO
                 {
                     Title = "Warning: Course Plan Issue",
-                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{coursePlanJson}",
-                    Lessons = new List<LessonDTO>()
+                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{fixedJson}",
+                    Lessons = new List<LessonPlanDTO>()
                 };
             }
 
             return Ok(coursePlan);
-
-            // Temporarily mock resonse
-            //var mockPlan = new CoursePlanDTO
-            //{
-            //    Title = input.Topic,
-            //    Description = "AI generated course description",
-            //    Lessons = new List<LessonDTO>
-            //    {
-            //        new LessonDTO
-            //        {
-            //            Title = "Introduction",
-            //            Description = "Overview of the Course"
-            //        },
-            //        new LessonDTO
-            //        {
-            //            Title = "Lesson 1",
-            //            Description = "Basics of the topic."
-            //        }
-            //    }
-            //};
-
-            //return Ok(coursePlanJson);
         }
 
         // POST: ai/AdjustCourse
@@ -155,23 +140,23 @@ namespace OpenEdAI.API.Controllers
         public async Task<IActionResult> AdjustCourse([FromBody] JsonElement payload)
         {
             var userId = GetUserIdFromToken();
-
             if (string.IsNullOrEmpty(userId))
             {
+                _logger.LogWarning("User ID not found in token.");
                 return Unauthorized("User ID not found in token.");
             }
 
-            // Log received payload properties for debugging
-            Console.WriteLine("Received payload:");
+            _logger.LogInformation("Received payload for course adjustment.");
             foreach (var prop in payload.EnumerateObject())
             {
-                Console.WriteLine($"Property: {prop.Name}");
+                _logger.LogInformation("Payload property: {PropertyName}", prop.Name);
             }
 
             // Validate required fields exist
             if (!payload.TryGetProperty("userMessage", out JsonElement userMessageElement) ||
                 !payload.TryGetProperty("previousPlan", out JsonElement previousPlanElement))
             {
+                _logger.LogWarning("Missing required fields: UserMessage and/or PreviousPlan.");
                 return BadRequest("Missing required fields: UserMessage and/or PreviousPlan.");
             }
 
@@ -180,6 +165,7 @@ namespace OpenEdAI.API.Controllers
 
             if (string.IsNullOrWhiteSpace(userMessage) || string.IsNullOrWhiteSpace(previousPlanJson))
             {
+                _logger.LogWarning("UserMessage or PreviousPlan is empty.");
                 return BadRequest("UserMessage and PreviousPlan must not be empty.");
             }
 
@@ -187,27 +173,28 @@ namespace OpenEdAI.API.Controllers
             CoursePlanDTO previousPlan;
             try
             {
-                previousPlan = JsonSerializer.Deserialize<CoursePlanDTO>(previousPlanJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                previousPlan = JsonSerializer.Deserialize<CoursePlanDTO>(
+                    previousPlanJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
             }
             catch (JsonException ex)
             {
+                _logger.LogError(ex, "Failed to deserialize previous plan in AdjustCourse.");
                 return BadRequest("Failed to deserialize previous plan: " + ex.Message);
             }
-            
+
             // Retrieve the user's profile
             var profile = await _context.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null)
             {
+                _logger.LogWarning("User profile not found for user {UserId} in AdjustCourse.", userId);
                 return BadRequest("User profile not found.");
             }
 
             // Build the adjustment prompt
             var prompt = BuildAdjustmentPrompt(previousPlanJson, userMessage, profile);
-            Console.WriteLine("Adjustment prompt:");
-            Console.WriteLine(prompt);
+            _logger.LogInformation("Adjustment prompt generated:\n{Prompt}", prompt);
 
             ChatResponse chatResponse;
             try
@@ -228,26 +215,32 @@ namespace OpenEdAI.API.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error calling OpenAI API for adjustment: {ex.Message}");
+                _logger.LogError(ex, "Error calling OpenAI API for course adjustment.");
                 return StatusCode(500, ex.Message);
             }
 
             if (chatResponse?.Choices == null || chatResponse.Choices.Count == 0)
             {
+                _logger.LogError("No output received from OpenAI API for course adjustment.");
                 return StatusCode(500, "No output received from OpenAI API.");
             }
 
-            // Extract the raw AI-generated output
-            string adjustedPlanJson = chatResponse.Choices[0].Message.Content;
-            Console.WriteLine("Raw AI-generated adjusted output:");
-            Console.WriteLine(adjustedPlanJson);
+            // Get the content from the response
+            var adjustedPlanJson = chatResponse.Choices[0].Message.Content;
 
+            // Convert the JSON element to fixed string
+            string fixedJson = adjustedPlanJson.ValueKind == JsonValueKind.String
+                ? adjustedPlanJson.GetString()
+                : adjustedPlanJson.GetRawText().Trim();
+
+
+            _logger.LogInformation("Raw AI-generated adjusted output:\n{Output}", fixedJson);
 
             CoursePlanDTO adjustedPlan;
             try
             {
                 adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(
-                    adjustedPlanJson,
+                    fixedJson,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
                 );
                 // Validate that deserialization produced required fields
@@ -260,33 +253,17 @@ namespace OpenEdAI.API.Controllers
             }
             catch (JsonException ex)
             {
-                Console.WriteLine($"Deserialization error: {ex.Message}");
-
-                // Create a fallback warning CoursePlanDTO so that the front-end chat always has something to display
+                _logger.LogError(ex, "Deserialization error in AdjustCourse. AI response: {Output}", fixedJson);
+                // Fallback warning DTO so that the front-end chat always has something to display
                 adjustedPlan = new CoursePlanDTO
                 {
-                    Title = "Warning: Course Plan Issue",
-                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{adjustedPlanJson}",
-                    Lessons = new List<LessonDTO>()
+                    Title = "Warning: Adjusted Course Plan Issue",
+                    Description = $"The AI response did not generate the expected JSON format. Response received:\n{fixedJson}",
+                    Lessons = new List<LessonPlanDTO>()
                 };
             }
 
             return Ok(adjustedPlan);
-
-            // Mocked adjusted plan
-            //var adjustedPlan = new CoursePlanDTO
-            //{
-            //    Title = "Adjusted: " + previousPlan?.Title,
-            //    Description = "AI Adjusted Generated Course Description",
-            //    Lessons = new List<LessonDTO>
-            //    {
-            //        new LessonDTO { Title = "Refined Introduction", Description = "Updated overview with new focus." },
-            //        new LessonDTO { Title = "Lesson 1 (Revised)", Description = "Enhanced content for better clarity." },
-            //        new LessonDTO { Title = "Lesson 2", Description = "Additional lesson based on feedback." }
-            //    }
-            //};
-
-            //return Ok(adjustedPlan);
         }
 
         // POST: ai/SubmitCoursePlan
@@ -296,6 +273,7 @@ namespace OpenEdAI.API.Controllers
             var userId = GetUserIdFromToken();
             if (string.IsNullOrEmpty(userId))
             {
+                _logger.LogWarning("User ID not found in token in SubmitCoursePlan.");
                 return Unauthorized("User ID not found in token.");
             }
 
@@ -303,26 +281,29 @@ namespace OpenEdAI.API.Controllers
             var student = await _context.Students.FirstOrDefaultAsync(s => s.UserID == userId);
             if (student == null)
             {
+                _logger.LogWarning("Student not found for user {UserId} in SubmitCoursePlan.", userId);
                 return NotFound("Student not found.");
             }
 
-            // If this is the student's first time setting up their profile and creating a course,
-            // update their status
+            // Update the student's profile setup status if this is the first time
             if (!student.HasCompletedSetup)
             {
                 student.MarkSetupComplete();
             }
-            
+
             // Validate the course plan
             if (plan == null || string.IsNullOrWhiteSpace(plan.Title) || plan.Lessons == null || !plan.Lessons.Any())
             {
+                _logger.LogWarning("Invalid course plan submitted by user {UserId}.", userId);
                 return BadRequest("Invalid course plan.");
             }
 
             // TODO: Send the course plan to the search APIs to generate content links
+            // (Not saving changes for testing purposes)
+            //_context.SaveChangesAsync();
 
-            await _context.SaveChangesAsync();
-            return Ok(new {message = "Course finalized successfully."});
+            _logger.LogInformation("Course finalized successfully for user {UserId}.", userId);
+            return Ok(new { message = "Course finalized successfully." });
         }
 
         /// <summary>
@@ -371,11 +352,11 @@ namespace OpenEdAI.API.Controllers
             builder.AppendLine("Generate a description for the course to be used in the JSON as well as 'tags' for searching for the course and its lessons.");
             builder.AppendLine("Respond strictly in the following JSON format:");
             builder.AppendLine("{");
-            builder.AppendLine("  \"title\": \"Course Title\",");
-            builder.AppendLine("  \"description\": \"Description\",");
-            builder.AppendLine("  \"tags\": [\"tag1\", \"tag2\", \"etc.\"],");
-            builder.AppendLine("  \"lessons\": [");
-            builder.AppendLine("    { \"title\": \"Lesson 1 Title\", \"description\": \"Description\", \"tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
+            builder.AppendLine("  \"Title\": \"Course Title\",");
+            builder.AppendLine("  \"Description\": \"Description\",");
+            builder.AppendLine("  \"Tags\": [\"tag1\", \"tag2\", \"etc.\"],");
+            builder.AppendLine("  \"Lessons\": [");
+            builder.AppendLine("    { \"Title\": \"Lesson 1 Title\", \"Description\": \"Description\", \"Tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
             builder.AppendLine("  ]");
             builder.AppendLine("}");
             builder.AppendLine();
@@ -384,6 +365,5 @@ namespace OpenEdAI.API.Controllers
             builder.AppendLine("If the topic is too broad, ask the user to narrow it down or provide suggestions based on the topic. Respond in a manner consistent with the user's education level and special considerations.");
             return builder.ToString();
         }
-
     }
 }

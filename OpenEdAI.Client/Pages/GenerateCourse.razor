@@ -25,7 +25,7 @@
 
 	@if (generatedPlan != null)
 	{
-		<CoursePlanDisplay Plan="generatedPlan" IsFinalized="@isFinalized" />
+		<CoursePlanDisplay Plan="generatedPlan" />
 
 		<button class="btn btn-success send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
 
@@ -97,9 +97,9 @@
 			return Task.CompletedTask;
 		}
 
-		if (generatedPlan == null || !isFinalized)
+		if (generatedPlan == null)
 		{
-			// Prevent navigating away if a course plan is generated and not finalized (shows a confirmation dialog)
+			// Prevent navigating away if a course plan is not generated (shows a confirmation dialog)
 			context.PreventNavigation();
 		}
 
@@ -205,9 +205,6 @@
 				}
 
 				// TODO: Add a notification/popup to inform the user that the course is being finalized and they will be notified when it's ready.
-
-				// Mark the course as finalized
-				isFinalized = true;
 
 				// TODO: Add logic to send data to the backend for processing
 
