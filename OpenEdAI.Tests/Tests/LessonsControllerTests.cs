@@ -109,7 +109,7 @@ namespace OpenEdAI.Tests.Tests
             {
                 Title = "New Lesson",
                 Description = "Description",
-                ContentLink = "https://example.com",
+                ContentLinks = ["https://example.com"],
                 Tags = new List<string> { "test" },
                 CourseID = course.CourseID
             };
@@ -131,7 +131,7 @@ namespace OpenEdAI.Tests.Tests
             {
                 Title = "Lesson",
                 Description = "Description",
-                ContentLink = "https://example.com/lesson",
+                ContentLinks = ["https://example.com/lesson"],
                 Tags = new List<string> { "test" },
                 CourseID = -1
             };
@@ -157,7 +157,7 @@ namespace OpenEdAI.Tests.Tests
             {
                 Title = "Updated Title",
                 Description = "Updated Description",
-                ContentLink = "https://example.com/updatedLesson",
+                ContentLinks = ["https://example.com/updatedLesson"],
                 Tags = new List<string> { "updated" }
             };
 
@@ -179,7 +179,7 @@ namespace OpenEdAI.Tests.Tests
             {
                 Title = "Updated Title",
                 Description = "Updated Description",
-                ContentLink = "https://example.com/updatedLesson",
+                ContentLinks = ["https://example.com/updatedLesson"],
                 Tags = new List<string> { "updated" }
             };
 

@@ -63,14 +63,14 @@ namespace OpenEdAI.Tests.TestHelpers
             var lessons = new List<Lesson>
         {
             // For course with CourseID = 2 (Course With Lessons)
-            new Lesson("Lesson 1", "Introduction", "https://example.com/lesson1", new List<string>{"intro"}, courses[1].CourseID),
-            new Lesson("Lesson 2", "Advanced Topic", "https://example.com/lesson2", new List<string>{"advanced", "c#"}, courses[1].CourseID),
-            new Lesson("Lesson 3", "Final Thoughts", "https://example.com/lesson3", new List<string>{"final"}, courses[1].CourseID),
+            new Lesson("Lesson 1", "Introduction", new List<string> {"https://example.com/lesson1" }, new List<string>{"intro"}, courses[1].CourseID),
+            new Lesson("Lesson 2", "Advanced Topic", new List < string > { "https://example.com/lesson2" }, new List<string>{"advanced", "c#"}, courses[1].CourseID),
+            new Lesson("Lesson 3", "Final Thoughts", new List < string > { "https://example.com/lesson3" }, new List<string>{"final"}, courses[1].CourseID),
             
             // For course with CourseID = 3 (Exclusive Course)
-            new Lesson("Lesson 4", "Basics", "https://example.com/lessonA", new List<string>{"C#", "basics"}, courses[2].CourseID),
-            new Lesson("Lesson 5", "Deep Dive", "https://example.com/lessonB", new List<string>{"deepdive", "intermediate"}, courses[2].CourseID),
-            new Lesson("Lesson 6", "Summary", "https://example.com/lessonC", new List<string>{"summary", ".net"}, courses[2].CourseID)
+            new Lesson("Lesson 4", "Basics", new List < string > { "https://example.com/lessonA" }, new List<string>{"C#", "basics"}, courses[2].CourseID),
+            new Lesson("Lesson 5", "Deep Dive", new List < string > { "https://example.com/lessonB" }, new List<string>{"deepdive", "intermediate"}, courses[2].CourseID),
+            new Lesson("Lesson 6", "Summary", new List < string > { "https://example.com/lessonC" }, new List<string>{"summary", ".net"}, courses[2].CourseID)
         };
             context.Lessons.AddRange(lessons);
             context.SaveChanges();

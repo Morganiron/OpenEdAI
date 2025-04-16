@@ -28,7 +28,7 @@ namespace OpenEdAI.API.Controllers
                     LessonID = l.LessonID,
                     Title = l.Title,
                     Description = l.Description,
-                    ContentLink = l.ContentLink,
+                    ContentLinks = l.ContentLinks,
                     Tags = l.Tags,
                     CourseID = l.CourseID,
                     CreatedDate = l.CreatedDate,
@@ -50,7 +50,7 @@ namespace OpenEdAI.API.Controllers
                     LessonID = l.LessonID,
                     Title = l.Title,
                     Description = l.Description,
-                    ContentLink = l.ContentLink,
+                    ContentLinks = l.ContentLinks,
                     Tags = l.Tags,
                     CourseID = l.CourseID,
                     CreatedDate = l.CreatedDate,
@@ -80,7 +80,7 @@ namespace OpenEdAI.API.Controllers
                     LessonID = l.LessonID,
                     Title = l.Title,
                     Description = l.Description,
-                    ContentLink = l.ContentLink,
+                    ContentLinks = l.ContentLinks,
                     Tags = l.Tags,
                     CourseID = l.CourseID,
                     CreatedDate = l.CreatedDate,
@@ -107,7 +107,7 @@ namespace OpenEdAI.API.Controllers
             }
 
             // Create a new Lesson entity using the provided data
-            var lesson = new Lesson(createDto.Title, createDto.Description, createDto.ContentLink, createDto.Tags, createDto.CourseID);
+            var lesson = new Lesson(createDto.Title, createDto.Description, createDto.ContentLinks, createDto.Tags, createDto.CourseID);
             
             _context.Lessons.Add(lesson);
             await _context.SaveChangesAsync();
@@ -118,7 +118,7 @@ namespace OpenEdAI.API.Controllers
                 LessonID = lesson.LessonID,
                 Title = lesson.Title,
                 Description = lesson.Description,
-                ContentLink = lesson.ContentLink,
+                ContentLinks = lesson.ContentLinks,
                 Tags = lesson.Tags,
                 CourseID = lesson.CourseID,
                 CreatedDate = lesson.CreatedDate,
@@ -154,7 +154,7 @@ namespace OpenEdAI.API.Controllers
             // I need to add something for if a link is reported as inappropriate or invalid
 
             // Update only allowed properties
-            lesson.UpdateLesson(updateDto.Title, updateDto.Description, updateDto.Tags, updateDto.ContentLink);
+            lesson.UpdateLesson(updateDto.Title, updateDto.Description, updateDto.Tags, updateDto.ContentLinks);
 
             try
             {

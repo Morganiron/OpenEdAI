@@ -7,10 +7,14 @@ namespace OpenEdAI.API.Data
     {
         public ApplicationDbContext CreateDbContext(string[] args)
         {
+            // Determine the environment: default to Develpoment if not set
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE__ENVIRONMENT") ?? "Development";
             // Build configuration from appsettings.json
             IConfigurationRoot configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: true)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+                .AddUserSecrets<Program>(optional: true)
                 .AddEnvironmentVariables()
                 .Build();
 
