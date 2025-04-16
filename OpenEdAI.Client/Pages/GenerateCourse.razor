@@ -28,6 +28,7 @@
 		<CoursePlanDisplay Plan="generatedPlan" />
 
 		<button class="btn btn-success send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
+		<button class="btn btn-clear reset-button" @onclick="ClearCoursePlan">Start Over</button>
 
 		<CoursePlanChat Messages="chatMessages" OnUserMessageSent="HandleUserChatMessage" />
 	}
@@ -40,7 +41,6 @@
 
 @code {
 	private CoursePlanDTO generatedPlan;
-	private bool isFinalized = false;
 	private List<CoursePlanChat.ChatMessage> chatMessages = new();
 	private bool isLoggingOut = false;
 
@@ -186,6 +186,26 @@
 		{
 			Loader.Hide();
 		}
+	}
+	// Clear the stored CoursePlan and Chat and refresh the page
+	private async Task ClearCoursePlan()
+	{
+		// Show a confirmation popup to the user
+		bool shouldClear = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to start over?\nThis will clear your chat and generated course plan.");
+
+		if (shouldClear)
+		{
+			await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
+			await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+
+			// Reset the in-memory state
+			generatedPlan = null;
+			chatMessages.Clear();
+
+			// Trigger a re-render of the current component
+			StateHasChanged();
+		}
+		
 	}
 
 

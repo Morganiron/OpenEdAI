@@ -350,7 +350,7 @@ body {
             outline: none;
         }
 
-/* ========== Submission Button Styles ========== */
+/* ========== Button Styles ========== */
 .send-button {
     padding: 0.6rem 1.2rem;
     background-color: #2c3e50;
@@ -365,4 +365,22 @@ body {
     .send-button:hover {
         background-color: #1f2a38;
     }
-    
+
+.reset-button {
+    /* Match styling used for your .send-button or .btn.btn-success */
+    padding: 0.6rem 1.2rem;
+    background-color: #2c3e50; /* same as .send-button */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    /* Put it on the right side */
+    float: right;
+    margin-left: 1rem; /* some spacing so it’s not jammed against the other button */
+}
+
+    .reset-button:hover {
+        background-color: #1f2a38; /* same hover color used for send-button */
+    }   
