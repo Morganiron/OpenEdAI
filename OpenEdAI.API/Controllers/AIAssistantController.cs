@@ -76,8 +76,8 @@ namespace OpenEdAI.API.Controllers
                     new Message(Role.User, prompt)
                 };
 
-                // 0.7 is chosen for a balanced output between determinism and creativity.
-                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.7);
+                // Temperature of 0.2 seems to respond with very good results
+                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.2);
                 // Call the ChatEndpoint asynchronously
                 chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
             }
@@ -209,7 +209,7 @@ namespace OpenEdAI.API.Controllers
                         "If the adjustment request is unclear or the topic is inappropriate, return a JSON warning message instead."),
                     new Message(Role.User, prompt)
                 };
-
+                // Setting the temperature slightly higher to provide more creative results for changes
                 var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.7);
                 chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
             }
@@ -325,7 +325,16 @@ namespace OpenEdAI.API.Controllers
             builder.AppendLine($"- Additional Info: {profile.AdditionalConsiderations}");
             builder.AppendLine();
             builder.AppendLine("Update the course plan based on the above adjustment request and provided user details.");
-            builder.AppendLine("Respond strictly in the same JSON format as the original course plan.");
+            builder.AppendLine();
+            builder.AppendLine("Respond strictly in the following JSON format:");
+            builder.AppendLine("{");
+            builder.AppendLine("  \"Title\": \"Course Title\",");
+            builder.AppendLine("  \"Description\": \"Description\",");
+            builder.AppendLine("  \"Tags\": [\"tag1\", \"tag2\", \"etc.\"],");
+            builder.AppendLine("  \"Lessons\": [");
+            builder.AppendLine("    { \"Title\": \"Lesson 1 Title\", \"Description\": \"Description\", \"Tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
+            builder.AppendLine("  ]");
+            builder.AppendLine("}");
             builder.AppendLine("If the adjustment request is unclear or invalid, return a JSON warning message instead.");
             return builder.ToString();
         }
