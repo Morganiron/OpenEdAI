@@ -94,6 +94,11 @@ builder.Services.AddControllers();
 builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
 builder.Services.AddHttpClient();
 
+// Backround task and search services (backround queue capacity set to 100)
+builder.Services.AddSingleton<IBackgroundTaskQueue>(new BackgroundTaskQueue(100));
+builder.Services.AddHostedService<QueuedHostedService>();
+builder.Services.AddSingleton<IContentSearchService, DummyContentSearchService>();
+
 // Disable Claims mapping
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 

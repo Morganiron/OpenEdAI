@@ -11,6 +11,8 @@ using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
 using System.Numerics;
+using OpenEdAI.API.Services;
+using Newtonsoft.Json.Linq;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -21,11 +23,23 @@ namespace OpenEdAI.API.Controllers
         private readonly ApplicationDbContext _context;
         private readonly OpenAIClient _openAiClient;
         private readonly ILogger<AIAssistantController> _logger;
+        private readonly IBackgroundTaskQueue _backgroundTaskQueue;
+        private readonly IContentSearchService _contentSearchService;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public AIAssistantController(ApplicationDbContext context, IConfiguration configuration, ILogger<AIAssistantController> logger)
+        public AIAssistantController(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            ILogger<AIAssistantController> logger,
+            IBackgroundTaskQueue backgroundTaskQueue,
+            IContentSearchService contentSearchService,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _context = context;
             _logger = logger;
+            _backgroundTaskQueue = backgroundTaskQueue;
+            _contentSearchService = contentSearchService;
+            _serviceScopeFactory = serviceScopeFactory;
 
             // Retrieve the API key from configuration
             var apiKey = configuration["OpenAi:LearningPathKey"];
@@ -268,8 +282,9 @@ namespace OpenEdAI.API.Controllers
 
         // POST: ai/SubmitCoursePlan
         [HttpPost("submit-course")]
-        public async Task<IActionResult> SubmitCoursePlan([FromBody] SubmittedCourseDTO plan)
+        public async Task<IActionResult> SubmitCoursePlan([FromBody] CoursePlanDTO plan)
         {
+            // Validate the user
             var userId = GetUserIdFromToken();
             if (string.IsNullOrEmpty(userId))
             {
@@ -298,12 +313,108 @@ namespace OpenEdAI.API.Controllers
                 return BadRequest("Invalid course plan.");
             }
 
-            // TODO: Send the course plan to the search APIs to generate content links
-            // (Not saving changes for testing purposes)
-            //_context.SaveChangesAsync();
+            // Enqueue a background task for generating content links
+            _backgroundTaskQueue.EnqueueBackgroundWorkItem(async token =>
+            {
+                try
+                {
+                    // Create a new scope so we get a fresh DbContext and services
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var scopedContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var scopedContentSearchService = scope.ServiceProvider.GetRequiredService<IContentSearchService>();
+
+                    // Retrieve the student's profile
+                    var profileEntity = await scopedContext.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+                    if (profileEntity == null)
+                    {
+                        _logger.LogWarning("Student profile not found for user {UserId} during background processing.", userId);
+                    }
+                    // Store the profile in a DTO
+                    var studentProfile = new StudentProfileDTO
+                    {
+                        EducationLevel = profileEntity.EducationLevel,
+                        PreferredContentTypes = profileEntity.PreferredContentTypes,
+                        SpecialConsiderations = profileEntity.SpecialConsiderations,
+                        AdditionalConsiderations = profileEntity.AdditionalConsiderations
+                    };
+
+                    // Rebuild the course and lessons in this scope
+                    var courseToSave = new Course(
+                    plan.Title,
+                    plan.Description,
+                    plan.Tags,
+                    userId,
+                    student.UserName);
+
+                    foreach (var lessonPLan in plan.Lessons)
+                    {
+                        //TODO: Create a more advanced search query
+                        var contentLinks = await scopedContentSearchService.SearchContentLinksAsync(
+                            lessonPLan.Title, lessonPLan.Description, lessonPLan.Tags, studentProfile, token);
+
+                        // Create a new lesson object, add the content links, add the lesson to the Course Object.
+                        var lesson = new Lesson(
+                            lessonPLan.Title,
+                            lessonPLan.Description,
+                            contentLinks,
+                            lessonPLan.Tags,
+                            /* courseId placeholder */ 0);
+
+                        // Attach to the course
+                        courseToSave.Lessons.Add(lesson);
+                    }
+
+                    // Save the new Course and lessons to the database
+                    // (Not saving changes for testing purposes)
+                    //scopedContext.Courses.Add(courseToSave);
+                    //await scopedContext.SaveChangesAsync(token);
+
+                    _logger.LogInformation("Completed background processing for course '{CourseTitle}'.", plan.Title);
+
+                    // ---- Output all of the data to the console --- //
+                    var logPayload = new
+                    {
+                        Course = new
+                        {
+                            ID = courseToSave.CourseID,
+                            Title = courseToSave.Title,
+                            Description = courseToSave.Description,
+                            Tags = courseToSave.Tags
+                        },
+                        Lessons = courseToSave.Lessons.Select(l => new
+                        {
+                            ID = l.LessonID,
+                            Title = l.Title,
+                            Description = l.Description,
+                            Tags = l.Tags,
+                            ContentLinks = l.ContentLinks
+                        })
+                    };
+
+                    // Serialize to JSON
+                    var json = JsonSerializer.Serialize(
+                        logPayload,
+                        new JsonSerializerOptions { WriteIndented = true }
+                    );
+
+                    // Emit as a single log line
+                    _logger.LogInformation("Enriched course data: {CourseJson}", json);
+
+                    // --------------------------------------------------
+
+                    
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Background job failed for the course.");
+                    return;
+                }
+
+            });
 
             _logger.LogInformation("Course finalized successfully for user {UserId}.", userId);
             return Ok(new { message = "Course finalized successfully." });
+        
         }
 
         /// <summary>
