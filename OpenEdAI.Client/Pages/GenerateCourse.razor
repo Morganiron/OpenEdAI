@@ -41,6 +41,7 @@
 
 @code {
 	private CoursePlanDTO generatedPlan;
+	private CoursePersonalizationInput lastInput;
 	private List<CoursePlanChat.ChatMessage> chatMessages = new();
 	private bool isLoggingOut = false;
 
@@ -59,6 +60,7 @@
 
 	private async Task HandleCourseInput(CoursePersonalizationInput input)
 	{
+		lastInput = input;
 		try
 		{
 			Loader.Show();
@@ -205,7 +207,7 @@
 			// Trigger a re-render of the current component
 			StateHasChanged();
 		}
-		
+
 	}
 
 
@@ -214,7 +216,12 @@
 		Loader.Show();
 		try
 		{
-			var response = await Http.PostAsJsonAsync("ai/submit-course", generatedPlan);
+			var payload = new SubmitCourseRequest
+				{
+					UserInput = lastInput,
+					Plan = generatedPlan
+				};
+			var response = await Http.PostAsJsonAsync("ai/submit-course", payload);
 
 			if (response.IsSuccessStatusCode)
 			{

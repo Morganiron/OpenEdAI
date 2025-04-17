@@ -21,8 +21,6 @@
 
     <h3>Your Profile</h3>
 
-    <button @onclick="RefreshToken">Trigger Refresh Token</button>
-
     @if (isLoading)
     {
         <p>Loading profile...</p>
@@ -158,11 +156,6 @@
     private readonly string educationOtherDefault = "Education(Other): Please enter your education";
     private readonly string specialOtherDefault = "Special Considerations(Other): Please enter your special circumstance";
 
-    private async void RefreshToken()
-    {
-        await TokenManager.RefreshTokenAsync();
-    }
-
     // Method to build the default prompt(s) based on the current selections
     private string GetDefaultAdditionalPrompt()
     {
@@ -185,18 +178,29 @@
         try
         {
             await StudentProfileState.LoadStateAsync();
-            // Get current student
+
+            // Fetch the "remote" profile from the API
             var student = await StudentService.GetCurrentStudentAsync();
-            var local = StudentProfileState.ProfileDTO;
             var remote = student.Profile ?? new StudentProfileDTO();
 
-            // Set dto to local if it has changes, otherwise use remote 
-            if (local is not null && !AreProfilesEqual(local, remote))
+            // If the remote profile is null, set it to a new instance
+            var local = StudentProfileState.ProfileDTO ?? new StudentProfileDTO();
+
+            // Decide if the lcoal DTO actually has any user data
+            bool hasLocalData = 
+                !string.IsNullOrWhiteSpace(local.EducationLevel) ||
+                !string.IsNullOrWhiteSpace(local.PreferredContentTypes) ||
+                !string.IsNullOrWhiteSpace(local.SpecialConsiderations) ||
+                !string.IsNullOrWhiteSpace(local.AdditionalConsiderations);
+
+            if (hasLocalData && !AreProfilesEqual(local, remote))
             {
+                // Local overrides remote (user has edited but not yet saved)
                 StudentProfileState.ProfileDTO = local;
             }
             else
             {
+				// Otherwise, use the remote profile
 				StudentProfileState.ProfileDTO = remote;
 				await StudentProfileState.SaveStateAsync();
             }
@@ -216,6 +220,7 @@
 
             editContext = new EditContext(profileModel);
 
+			// Initialize the checkboxes
             foreach (var type in availableContentTypes)
             {
                 contentTypeSelections[type] = profileModel.PreferredContentTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(type) ?? false;
