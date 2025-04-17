@@ -14,6 +14,7 @@ using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using Amazon.CognitoIdentityProvider;
+using OpenAI;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -94,10 +95,22 @@ builder.Services.AddControllers();
 builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
 builder.Services.AddHttpClient();
 
+// Register OpenAI client with the API key from configuration
+builder.Services.AddSingleton(sp =>
+{
+    var apiKey = builder.Configuration["OpenAi:LearningPathKey"]
+        ?? throw new InvalidOperationException("Missing OpenAi:LearningPathKey");
+    return new OpenAIClient(new OpenAIAuthentication(apiKey));
+});
+
+// Register the AI-driven plan and content search services
+builder.Services.AddSingleton<AIDrivenSearchPlanService>();
+builder.Services.AddSingleton<IContentSearchService, AIDrivenContentSearchService>();
+
+
 // Backround task and search services (backround queue capacity set to 100)
 builder.Services.AddSingleton<IBackgroundTaskQueue>(new BackgroundTaskQueue(100));
 builder.Services.AddHostedService<QueuedHostedService>();
-builder.Services.AddSingleton<IContentSearchService, DummyContentSearchService>();
 
 // Disable Claims mapping
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
