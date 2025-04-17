@@ -8,9 +8,9 @@ namespace OpenEdAI.API.Services
             /// Searches for content links based on lesson details and the student's profile
             /// </summary>
             Task<List<string>> SearchContentLinksAsync(
-                string lessontTitle,
-                string lessonDescription,
-                List<string> tags,
+                CoursePersonalizationInput userInput,
+                CoursePlanDTO coursePlan,
+                LessonSearchPlanDTO lessonSearchPlan,
                 StudentProfileDTO studentProfile,
                 CancellationToken cancellationToken);
         
