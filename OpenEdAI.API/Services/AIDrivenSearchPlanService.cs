@@ -62,7 +62,7 @@ namespace OpenEdAI.API.Services
                 new Message(Role.System, systemPrompt),
                 new Message(Role.User, userPrompt)
             };
-            var chatReq = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.2);
+            var chatReq = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.3);
 
             var resp = await _ai.ChatEndpoint.GetCompletionAsync(chatReq, cancellationToken: ct);
 
@@ -119,7 +119,7 @@ namespace OpenEdAI.API.Services
             sb.AppendLine("        \"Provider\": \"YouTube\"|\"CustomSearch\",");
             sb.AppendLine("        \"Query\": string,");
             sb.AppendLine("        \"ExcludedSites\": [string],");
-            sb.AppendLine("        \"MaxResults\": int");
+            sb.AppendLine("        \"MaxResults\": 4");
             sb.AppendLine("      }");
             sb.AppendLine("    ]");
             sb.AppendLine("  }");
@@ -135,7 +135,7 @@ namespace OpenEdAI.API.Services
                 sb.AppendLine();
                 sb.AppendLine("### Video Queries ###");
                 sb.AppendLine("1) Build a string to query YouTube (Provider=\"YouTube\") for content that is appropriate based on the user's profile, lesson title, lesson description, and any additional context provided.");
-                sb.AppendLine("2) Build a string to query Custom Search (Provider=\"CustomSearch\") for content that is appropriate based on the user's profile, lesson title, lesson description, and any additional context provided. Include \"-site:youtube.com\" in the \"ExcludedSites\" section of the JSON array for this lesson.");
+                sb.AppendLine("2) Build a string to query Custom Search (Provider=\"CustomSearch\") for content that is appropriate based on the user's profile, lesson title, lesson description, and any additional context provided. Include qualifiers to ensure this search is only for videos(eg. filetype:mp4 OR \"watch?v=\" OR vimeo.com). Include \"-site:youtube.com\" in the \"ExcludedSites\" section of the JSON array for this lesson.");
             }
 
             if (prefs.Contains("Articles"))

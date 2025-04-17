@@ -80,18 +80,17 @@ namespace OpenEdAI.API.Controllers
                 // Create a ChatRequest with a single system & user message.
                 var messages = new[]
                 {
-                    new Message(Role.System, "You are a helpful and inclusive AI course planner. " +
-                                               "Your job is to generate structured course outlines based on user input and personal learning profiles. " +
-                                               "Respond only in clean, valid JSON format and strictly follow the structure provided. " +
-                                               "DO NOT include any additional commentary. " +
-                                               "When generating lesson tags and descriptions, make them optimized for search engines — use keywords someone might type into YouTube or Google when looking to learn that lesson. " +
-                                               "Try to infer how someone with this learner's background would phrase their search queries, and reflect that in the tags and lesson titles. " +
-                                               "If the topic is offensive, inappropriate, or too broad, return a JSON warning message instead."),
+                    new Message(Role.System, "You are a helpful, inclusive AI course planner. "
+                                              + "Always prioritise the learner profile (education level & special considerations). "
+                                              + "If the profile hints at limited attention (e.g., ADHD) break dense topics into short micro‑lessons. "
+                                              + "Return CLEAN, valid JSON only — no commentary or code‑fences. "
+                                              + "Optimise titles & tags for the search terms this learner would use. "
+                                              + "If the topic is offensive, inappropriate, or too broad, return a JSON warning."),
                     new Message(Role.User, prompt)
                 };
 
                 // Temperature of 0.2 seems to respond with very good results
-                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.2);
+                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.3);
                 // Call the ChatEndpoint asynchronously
                 chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
             }
@@ -235,11 +234,11 @@ namespace OpenEdAI.API.Controllers
                 // Create messages for the adjustment request:
                 var messages = new[]
                 {
-                    new Message(Role.System, "You are a helpful and inclusive AI course planner. " +
-                        "Your job is to adjust an existing course plan based on user feedback. " +
-                        "Respond only in clean, valid JSON format and strictly follow the provided structure. " +
-                        "Do not include any additional commentary. " +
-                        "If the adjustment request is unclear or the topic is inappropriate, return a JSON warning message instead."),
+                    new Message(Role.System, "You are a helpful, inclusive AI course planner. "
+                                            + "Your job is to adjust an existing plan based on feedback. "
+                                            + "Always prioritise the learner profile; create micro‑lessons when attention issues exist. "
+                                            + "Return CLEAN, valid JSON only — no commentary or code‑fences. "
+                                            + "If the adjustment request is unclear, inappropriate, or violates policy, return a JSON warning."),
                     new Message(Role.User, prompt)
                 };
                 // Setting the temperature slightly higher to provide more creative results for changes
@@ -478,32 +477,41 @@ namespace OpenEdAI.API.Controllers
         /// </summary>
         private string BuildAdjustmentPrompt(string previousPlanJson, string userMessage, StudentProfile profile)
         {
-            var builder = new StringBuilder();
-            builder.AppendLine("Current Course Plan (in JSON):");
-            builder.AppendLine(previousPlanJson);
-            builder.AppendLine();
-            builder.AppendLine("User Adjustment:");
-            builder.AppendLine(userMessage);
-            builder.AppendLine();
-            builder.AppendLine("Consider the following user information regarding learning style, education level, special needs, and preferences:");
-            builder.AppendLine($"- Education Level: {profile.EducationLevel}");
-            builder.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes}");
-            builder.AppendLine($"- Special Considerations: {profile.SpecialConsiderations}");
-            builder.AppendLine($"- Additional Info: {profile.AdditionalConsiderations}");
-            builder.AppendLine();
-            builder.AppendLine("Update the course plan based on the above adjustment request and provided user details.");
-            builder.AppendLine();
-            builder.AppendLine("Respond strictly in the following JSON format:");
-            builder.AppendLine("{");
-            builder.AppendLine("  \"Title\": \"Course Title\",");
-            builder.AppendLine("  \"Description\": \"Description\",");
-            builder.AppendLine("  \"Tags\": [\"tag1\", \"tag2\", \"etc.\"],");
-            builder.AppendLine("  \"Lessons\": [");
-            builder.AppendLine("    { \"Title\": \"Lesson 1 Title\", \"Description\": \"Description\", \"Tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
-            builder.AppendLine("  ]");
-            builder.AppendLine("}");
-            builder.AppendLine("If the adjustment request is unclear or invalid, return a JSON warning message instead.");
-            return builder.ToString();
+            var sb = new StringBuilder();
+
+            sb.AppendLine("## COURSE‑PLAN ADJUSTMENT — RETURN STRICT JSON ONLY ##");
+            sb.AppendLine();
+            sb.AppendLine("### Learner Profile");
+            sb.AppendLine($"EducationLevel: {profile.EducationLevel}");
+            sb.AppendLine($"SpecialConsiderations: {profile.SpecialConsiderations ?? "None"}");
+            sb.AppendLine($"PreferredContentTypes: {profile.PreferredContentTypes ?? "None"}");
+            sb.AppendLine($"AdditionalLearnerInfo: {profile.AdditionalConsiderations ?? "None"}");
+            sb.AppendLine();
+            sb.AppendLine("### CurrentPlanJSON");
+            sb.AppendLine(previousPlanJson);
+            sb.AppendLine();
+            sb.AppendLine("### UserRequest");
+            sb.AppendLine(userMessage);
+            sb.AppendLine();
+            sb.AppendLine("### Requirements");
+            sb.AppendLine("1. Update the plan **respecting ALL learner profile info**.");
+            sb.AppendLine("   •  If attention‑span issues (e.g., ADHD) → split large ideas into micro‑lessons.");
+            sb.AppendLine("2. Keep a single‑level `Lessons[]` array (no chapters).");
+            sb.AppendLine("3. Structure & schema must match exactly:");
+            sb.AppendLine("   {");
+            sb.AppendLine("     \"Title\": string,");
+            sb.AppendLine("     \"Description\": string,");
+            sb.AppendLine("     \"Tags\": [string],");
+            sb.AppendLine("     \"Lessons\": [");
+            sb.AppendLine("       { \"Title\": string, \"Description\": string, \"Tags\": [string] }");
+            sb.AppendLine("     ]");
+            sb.AppendLine("   }");
+            sb.AppendLine("4. Optimise `Tags` and `Lesson.Title` for real‑world search phrases.");
+            sb.AppendLine("5. If the request is unclear / violates policy, reply with:");
+            sb.AppendLine("   {\"Warning\":\"<explanation>\"}");
+            sb.AppendLine();
+            sb.AppendLine("### Produce the JSON now.");
+            return sb.ToString();
         }
 
         /// <summary>
@@ -511,35 +519,44 @@ namespace OpenEdAI.API.Controllers
         /// </summary>
         private string BuildPrompt(CoursePersonalizationInput input, StudentProfile profile)
         {
-            var builder = new StringBuilder();
-            builder.AppendLine($"Create a structured course on the topic: {input.Topic}");
-            builder.AppendLine($"Experience Level: {input.ExperienceLevel}");
+            var sb = new StringBuilder();
+
+            sb.AppendLine("### COURSE GENERATION REQUEST - RETURN STRICT JSON ONLY ###");
+            sb.AppendLine();
+            sb.AppendLine("### Learner Profile");
+            sb.AppendLine($"- Education Level: {profile.EducationLevel}");
+            sb.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes ?? "None"}");
+            sb.AppendLine($"- Special Needs or Considerations: {profile.SpecialConsiderations ?? "None"}");
+            sb.AppendLine($"- Additional Learner Info: {profile.AdditionalConsiderations ?? "None"}");
+            sb.AppendLine();
+            sb.AppendLine("### Course Parameters");
+            sb.AppendLine($"Topic: {input.Topic}");
+            sb.AppendLine($"Learner Experience Level: {input.ExperienceLevel}");
             if (!string.IsNullOrWhiteSpace(input.AdditionalContext))
             {
-                builder.AppendLine($"Additional User Context: {input.AdditionalContext}");
+                sb.AppendLine($"Additional User Context: {input.AdditionalContext}");
             }
-            builder.AppendLine();
-            builder.AppendLine("Consider the following user information regarding learning style, education level, special needs, and preferences:");
-            builder.AppendLine($"- Education Level: {profile.EducationLevel}");
-            builder.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes}");
-            builder.AppendLine($"- Special Considerations: {profile.SpecialConsiderations}");
-            builder.AppendLine($"- Additional Info: {profile.AdditionalConsiderations}");
-            builder.AppendLine();
-            builder.AppendLine("Generate a description for the course to be used in the JSON as well as 'tags' for searching for the course and its lessons.");
-            builder.AppendLine("Respond strictly in the following JSON format:");
-            builder.AppendLine("{");
-            builder.AppendLine("  \"Title\": \"Course Title\",");
-            builder.AppendLine("  \"Description\": \"Description\",");
-            builder.AppendLine("  \"Tags\": [\"tag1\", \"tag2\", \"etc.\"],");
-            builder.AppendLine("  \"Lessons\": [");
-            builder.AppendLine("    { \"Title\": \"Lesson 1 Title\", \"Description\": \"Description\", \"Tags\": [\"tag1\", \"tag2\", \"etc.\"] }");
-            builder.AppendLine("  ]");
-            builder.AppendLine("}");
-            builder.AppendLine();
-            builder.AppendLine("If the topic includes any inappropriate, hateful, or offensive language, return a JSON warning message instead.");
-            builder.AppendLine("Avoid explicit, harmful, illegal, or discriminatory content. If unsure, return a warning message and do not generate a course plan.");
-            builder.AppendLine("If the topic is too broad, ask the user to narrow it down or provide suggestions based on the topic. Respond in a manner consistent with the user's education level and special considerations.");
-            return builder.ToString();
+            sb.AppendLine();
+            sb.AppendLine("### Requirements");
+            sb.AppendLine("1. **Prioritise learner profile** — lesson length, depth, and ordering must suit the stated education level **and** any special considerations.");
+            sb.AppendLine("   •  If profile hints at limited attention (e.g., ADHD), break dense ideas into 15‑25 minute micro‑lessons.");
+            sb.AppendLine("2. Single‑level structure (no chapters) ⇒ `Lessons[]` is a flat array.");
+            sb.AppendLine("3. Use plain, valid JSON *only* (no markdown, no commentary, no code‑fences).");
+            sb.AppendLine("4. Schema to follow exactly:");
+            sb.AppendLine("   {");
+            sb.AppendLine("     \"Title\": string,");
+            sb.AppendLine("     \"Description\": string,");
+            sb.AppendLine("     \"Tags\": [string],");
+            sb.AppendLine("     \"Lessons\": [");
+            sb.AppendLine("       { \"Title\": string, \"Description\": string, \"Tags\": [string] }");
+            sb.AppendLine("     ]");
+            sb.AppendLine("   }");
+            sb.AppendLine("5. Optimise all `Tags` and `Lesson.Title` fields as SEO phrases the learner would actually search.");
+            sb.AppendLine("6. If the topic is too broad or violates policy, reply with:");
+            sb.AppendLine("   {\"Warning\":\"<explanation>\"}");
+            sb.AppendLine();
+            sb.AppendLine("### Produce the JSON now."); 
+            return sb.ToString();
         }
     }
 }
