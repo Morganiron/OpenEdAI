@@ -115,6 +115,25 @@ namespace OpenEdAI.API.Controllers
                 ? coursePlanJson.GetString()
                 : coursePlanJson.GetRawText();
 
+            // If the string starts with a code fence, remove it
+            if (fixedJson.StartsWith("```"))
+            {
+                // Split lines
+                var lines = fixedJson
+                    .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None)
+                    .ToList();
+
+                // Remove the first and last lines (the code fence)
+                if (lines.Count >= 2)
+                {
+                    lines.RemoveAt(0); // Remove the first line
+                    if (lines.Last().StartsWith("```"))
+                        lines.RemoveAt(lines.Count - 1); // Remove the last line
+                }
+
+                fixedJson = string.Join('\n', lines).Trim();
+            }
+
             CoursePlanDTO coursePlan;
             try
             {
@@ -247,6 +266,25 @@ namespace OpenEdAI.API.Controllers
                 ? adjustedPlanJson.GetString()
                 : adjustedPlanJson.GetRawText().Trim();
 
+            // If the string starts with a code fence, remove it
+            if (fixedJson.StartsWith("```"))
+            {
+                // Split lines
+                var lines = fixedJson
+                    .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None)
+                    .ToList();
+
+                // Remove the first and last lines (the code fence)
+                if (lines.Count >= 2)
+                {
+                    lines.RemoveAt(0); // Remove the first line
+                    if (lines.Last().StartsWith("```"))
+                        lines.RemoveAt(lines.Count - 1); // Remove the last line
+                }
+
+                fixedJson = string.Join('\n', lines).Trim();
+            }
+
 
             _logger.LogInformation("Raw AI-generated adjusted output:\n{Output}", fixedJson);
 
@@ -282,8 +320,12 @@ namespace OpenEdAI.API.Controllers
 
         // POST: ai/SubmitCoursePlan
         [HttpPost("submit-course")]
-        public async Task<IActionResult> SubmitCoursePlan([FromBody] CoursePlanDTO plan)
+        public async Task<IActionResult> SubmitCoursePlan([FromBody] SubmitCourseRequest request)
         {
+            // Get the course plan and user input from the request
+            var userInput = request.UserInput;
+            var plan = request.Plan;
+
             // Validate the user
             var userId = GetUserIdFromToken();
             if (string.IsNullOrEmpty(userId))
@@ -321,7 +363,8 @@ namespace OpenEdAI.API.Controllers
                     // Create a new scope so we get a fresh DbContext and services
                     using var scope = _serviceScopeFactory.CreateScope();
                     var scopedContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var scopedContentSearchService = scope.ServiceProvider.GetRequiredService<IContentSearchService>();
+                    var planSvc = scope.ServiceProvider.GetRequiredService<AIDrivenSearchPlanService>();
+                    var contentSearchSvc = scope.ServiceProvider.GetRequiredService<IContentSearchService>();
 
                     // Retrieve the student's profile
                     var profileEntity = await scopedContext.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
@@ -346,21 +389,34 @@ namespace OpenEdAI.API.Controllers
                     userId,
                     student.UserName);
 
-                    foreach (var lessonPLan in plan.Lessons)
+                    // Call the AI to genreate the content links for all lessons
+                    var searchPlans = await planSvc.GeneratePlanAsync(
+                        userInput,
+                        plan,
+                        studentProfile,
+                        token
+                    );
+
+                    // Execute each lesson's queries
+                    foreach (var lessonPlan in searchPlans)
                     {
-                        //TODO: Create a more advanced search query
-                        var contentLinks = await scopedContentSearchService.SearchContentLinksAsync(
-                            lessonPLan.Title, lessonPLan.Description, lessonPLan.Tags, studentProfile, token);
+                        var contentLinks = await contentSearchSvc
+                        .SearchContentLinksAsync(
+                            userInput,
+                            plan,
+                            lessonPlan,
+                            studentProfile,
+                            token
+                        );
 
-                        // Create a new lesson object, add the content links, add the lesson to the Course Object.
                         var lesson = new Lesson(
-                            lessonPLan.Title,
-                            lessonPLan.Description,
+                            lessonPlan.LessonTitle,
+                            plan.Lessons.First(l => l.Title == lessonPlan.LessonTitle).Description,
                             contentLinks,
-                            lessonPLan.Tags,
-                            /* courseId placeholder */ 0);
+                            plan.Lessons.First(l => l.Title == lessonPlan.LessonTitle).Tags,
+                            /* courseId placeholder */ 0
+                            );
 
-                        // Attach to the course
                         courseToSave.Lessons.Add(lesson);
                     }
 
