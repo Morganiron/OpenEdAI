@@ -2,6 +2,8 @@
 {
     public class LinkVet
     {
+        private static ILogger _logger;
+
         // Domain allow-/deny-list
         private static readonly string[] _deny =
         {
@@ -9,11 +11,18 @@
             "/programs/",
             "/enroll/",
             "/careers/",
+            "/profile/",
             "/jobs",
             "?jid=",
             "/apply",
             "/admissions",
-            "/certificate"
+            "/certificate",
+            ".social",
+            "facebook.com",
+            "twitter.com",
+            "x.com",
+            "instagram.com",
+            "tubmlr.com"
         };
 
         // Trusted host allow list
@@ -54,6 +63,8 @@
                 "github.com"
             };
 
+        public static void Initialize(ILoggerFactory factory) => _logger = factory.CreateLogger<LinkVet>();
+        
         // Link vetting
         public static async Task<bool> IsAcceptableAsync(string url, string requestedType, HttpClient http, CancellationToken ct)
         {
@@ -128,7 +139,10 @@
                 if (res.IsSuccessStatusCode)
                     return res.Content.Headers.ContentType?.MediaType;
             }
-            catch { /* ignored */ }
+            catch (Exception ex) 
+            {
+                _logger.LogWarning(ex, "HEAD request failed, falling back to GET");
+            }
 
             // Some websites do not support HEAD requests, so fallback to GET
             try
@@ -144,7 +158,7 @@
             catch (Exception ex)
             {
                 // Log the exception if needed
-                Console.WriteLine($"LinkVet: Error checking URL {ex.Message}");
+                _logger.LogError(ex, "Error checking URL in LinkVet");
                 return null;
             }
 

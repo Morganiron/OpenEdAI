@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
@@ -10,9 +8,7 @@ using System.Text;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
-using System.Numerics;
 using OpenEdAI.API.Services;
-using Newtonsoft.Json.Linq;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -80,17 +76,18 @@ namespace OpenEdAI.API.Controllers
                 // Create a ChatRequest with a single system & user message.
                 var messages = new[]
                 {
-                    new Message(Role.System, "You are a helpful, inclusive AI course planner. "
-                                              + "Always prioritise the learner profile (education level & special considerations). "
-                                              + "If the profile hints at limited attention (e.g., ADHD) break dense topics into short micro‑lessons. "
-                                              + "Return CLEAN, valid JSON only — no commentary or code‑fences. "
-                                              + "Optimise titles & tags for the search terms this learner would use. "
-                                              + "If the topic is offensive, inappropriate, or too broad, return a JSON warning."),
+                    new Message(Role.System,
+                    "You are a thoughtful and inclusive AI assistant. " +
+                    "Your role is to generate tailored learning paths for students based on their profile, goals, and needs. " +
+                    $"Prioritize the learner's education level, experience, and special considerations such as learning disabilities (e.g., {profile.SpecialConsiderations}). " +
+                    "Ensure each lesson is appropriately scoped and structured for their cognitive and developmental level. " +
+                    "Split complex topics into micro-lessons if needed. Output strict JSON only, no markdown or commentary. " +
+                    $"Titles and tags must reflect the real-world language a student at the {profile.EducationLevel} level would use in search queries. " +
+                    "Return a JSON warning if the topic is too broad or violates guidelines."),
                     new Message(Role.User, prompt)
                 };
 
-                // Temperature of 0.2 seems to respond with very good results
-                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.3);
+                var chatRequest = new ChatRequest(messages, model: Model.GPT4oMini.Id, temperature: 0.4);
                 // Call the ChatEndpoint asynchronously
                 chatResponse = await _openAiClient.ChatEndpoint.GetCompletionAsync(chatRequest);
             }
@@ -105,7 +102,7 @@ namespace OpenEdAI.API.Controllers
                 _logger.LogError("No output received from OpenAI API in GenerateCourse.");
                 return StatusCode(500, "No output received from OpenAI API.");
             }
-            
+
             // Get the response content
             var coursePlanJson = chatResponse.Choices[0].Message.Content;
 
@@ -142,7 +139,8 @@ namespace OpenEdAI.API.Controllers
                 );
 
                 // Validate deserialization produced required fields
-                if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) ||
+                if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) || 
+                    string.IsNullOrWhiteSpace(coursePlan.Description) || !coursePlan.Tags.Any() ||
                     coursePlan.Lessons == null || !coursePlan.Lessons.Any())
                 {
                     _logger.LogError("Error deserializing course plan. Missing required fields. CouserPlan:\n{Output}", fixedJson);
@@ -150,6 +148,7 @@ namespace OpenEdAI.API.Controllers
 
                     throw new JsonException("Missing required fields in CoursePlanDTO.");
                 }
+
                 return Ok(coursePlan);
             }
             catch (JsonException ex)
@@ -163,7 +162,6 @@ namespace OpenEdAI.API.Controllers
                     Lessons = new List<LessonPlanDTO>()
                 };
             }
-
             return Ok(coursePlan);
         }
 
@@ -176,12 +174,6 @@ namespace OpenEdAI.API.Controllers
             {
                 _logger.LogWarning("User ID not found in token.");
                 return Unauthorized("User ID not found in token.");
-            }
-
-            _logger.LogInformation("Received payload for course adjustment.");
-            foreach (var prop in payload.EnumerateObject())
-            {
-                _logger.LogInformation("Payload property: {PropertyName}", prop.Name);
             }
 
             // Validate required fields exist
@@ -226,7 +218,6 @@ namespace OpenEdAI.API.Controllers
 
             // Build the adjustment prompt
             var prompt = BuildAdjustmentPrompt(previousPlanJson, userMessage, profile);
-            _logger.LogInformation("Adjustment prompt generated:\n{Prompt}", prompt);
 
             ChatResponse chatResponse;
             try
@@ -234,11 +225,14 @@ namespace OpenEdAI.API.Controllers
                 // Create messages for the adjustment request:
                 var messages = new[]
                 {
-                    new Message(Role.System, "You are a helpful, inclusive AI course planner. "
-                                            + "Your job is to adjust an existing plan based on feedback. "
-                                            + "Always prioritise the learner profile; create micro‑lessons when attention issues exist. "
-                                            + "Return CLEAN, valid JSON only — no commentary or code‑fences. "
-                                            + "If the adjustment request is unclear, inappropriate, or violates policy, return a JSON warning."),
+                    new Message(Role.System,
+                    "You are a thoughtful and inclusive AI assistant. " +
+                    "Your role is to adjust the tailored learning paths for a student based on their profile, goals, and needs. " +
+                    $"Prioritize the learner's education level, experience, and special considerations such as learning disabilities (e.g.,  {profile.SpecialConsiderations} )." +
+                    "Ensure each lesson is appropriately scoped and structured for their cognitive and developmental level. " +
+                    "Split complex topics into micro-lessons if needed. Output strict JSON only, no markdown or commentary. " +
+                    $"Titles and tags must reflect the real-world language a student at the {profile.EducationLevel} level would use in search queries. " +
+                    "Return a JSON warning if the topic is too broad or violates guidelines."),
                     new Message(Role.User, prompt)
                 };
                 // Setting the temperature slightly higher to provide more creative results for changes
@@ -283,9 +277,6 @@ namespace OpenEdAI.API.Controllers
 
                 fixedJson = string.Join('\n', lines).Trim();
             }
-
-
-            _logger.LogInformation("Raw AI-generated adjusted output:\n{Output}", fixedJson);
 
             CoursePlanDTO adjustedPlan;
             try
@@ -348,7 +339,7 @@ namespace OpenEdAI.API.Controllers
             }
 
             // Validate the course plan
-            if (plan == null || string.IsNullOrWhiteSpace(plan.Title) || plan.Lessons == null || !plan.Lessons.Any())
+            if (plan == null || string.IsNullOrWhiteSpace(plan.Title) || plan.Tags == null || plan.Lessons == null || !plan.Lessons.Any())
             {
                 _logger.LogWarning("Invalid course plan submitted by user {UserId}.", userId);
                 return BadRequest("Invalid course plan.");
@@ -418,58 +409,16 @@ namespace OpenEdAI.API.Controllers
 
                         courseToSave.Lessons.Add(lesson);
                     }
-
-                    // Save the new Course and lessons to the database
-                    // (Not saving changes for testing purposes)
-                    //scopedContext.Courses.Add(courseToSave);
-                    //await scopedContext.SaveChangesAsync(token);
-
-                    _logger.LogInformation("Completed background processing for course '{CourseTitle}'.", plan.Title);
-
-                    // ---- Output all of the data to the console --- //
-                    var logPayload = new
-                    {
-                        Course = new
-                        {
-                            ID = courseToSave.CourseID,
-                            Title = courseToSave.Title,
-                            Description = courseToSave.Description,
-                            Tags = courseToSave.Tags
-                        },
-                        Lessons = courseToSave.Lessons.Select(l => new
-                        {
-                            ID = l.LessonID,
-                            Title = l.Title,
-                            Description = l.Description,
-                            Tags = l.Tags,
-                            ContentLinks = l.ContentLinks
-                        })
-                    };
-
-                    // Serialize to JSON
-                    var json = JsonSerializer.Serialize(
-                        logPayload,
-                        new JsonSerializerOptions { WriteIndented = true }
-                    );
-
-                    // Emit as a single log line
-                    _logger.LogInformation("Enriched course data: {CourseJson}", json);
-
-                    // --------------------------------------------------
-
-                    
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Background job failed for the course.");
                     return;
                 }
-
             });
 
-            _logger.LogInformation("Course finalized successfully for user {UserId}.", userId);
             return Ok(new { message = "Course finalized successfully." });
-        
+
         }
 
         /// <summary>
@@ -482,22 +431,32 @@ namespace OpenEdAI.API.Controllers
             sb.AppendLine("## COURSE‑PLAN ADJUSTMENT — RETURN STRICT JSON ONLY ##");
             sb.AppendLine();
             sb.AppendLine("### Learner Profile");
-            sb.AppendLine($"EducationLevel: {profile.EducationLevel}");
-            sb.AppendLine($"SpecialConsiderations: {profile.SpecialConsiderations ?? "None"}");
-            sb.AppendLine($"PreferredContentTypes: {profile.PreferredContentTypes ?? "None"}");
-            sb.AppendLine($"AdditionalLearnerInfo: {profile.AdditionalConsiderations ?? "None"}");
+            sb.AppendLine($"- Education Level: {profile.EducationLevel}");
+            sb.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes ?? "None"}");
+            sb.AppendLine($"- Special Needs or Considerations: {profile.SpecialConsiderations ?? "None"}");
+            sb.AppendLine($"- Key Interests & Background: {profile.AdditionalConsiderations ?? "None"}");
             sb.AppendLine();
-            sb.AppendLine("### CurrentPlanJSON");
+            sb.AppendLine("### PreviousPlanJSON");
             sb.AppendLine(previousPlanJson);
             sb.AppendLine();
-            sb.AppendLine("### UserRequest");
+            sb.AppendLine("### The user requests adjustments based on:");
             sb.AppendLine(userMessage);
             sb.AppendLine();
             sb.AppendLine("### Requirements");
-            sb.AppendLine("1. Update the plan **respecting ALL learner profile info**.");
-            sb.AppendLine("   •  If attention‑span issues (e.g., ADHD) → split large ideas into micro‑lessons.");
-            sb.AppendLine("2. Keep a single‑level `Lessons[]` array (no chapters).");
-            sb.AppendLine("3. Structure & schema must match exactly:");
+            sb.AppendLine($"   - Adjust lesson depth and pacing to match a student at the {profile.EducationLevel} level" +
+                          (!string.IsNullOrWhiteSpace(profile.SpecialConsiderations)
+                              ? $" and account for special considerations: {profile.SpecialConsiderations}."
+                              : "."));
+            sb.AppendLine("   If the profile information suggests the user may have issues with the topic based on education, special needs, or user request, break dense ideas into 15‑25 minute micro‑lessons.");
+            sb.AppendLine("   Pay close attention to any additional context, key interests, background, special needs, and education level when inferring titles, descriptions, and tags.");
+            sb.AppendLine("   Tags are 1-3 word phrases similar to hashtags to be used as search keywords.");
+            sb.AppendLine("   There should be a set of tags for the course and a set of tags for each lesson.");
+            sb.AppendLine("   - Example Tag patterns:");
+            sb.AppendLine("     * \"{Topic} for {ExperienceLevel}\"");
+            sb.AppendLine("     * \"{Topic} for people with {SpecialConsiderations}\"");
+            sb.AppendLine("     * \"{ExperienceLevel} {Topic} for {EducationLevel}\"");
+            sb.AppendLine("     * Add any other combinations that tie topic, experience, special needs, and education level.");
+            sb.AppendLine("2. Structure & schema must match exactly:");
             sb.AppendLine("   {");
             sb.AppendLine("     \"Title\": string,");
             sb.AppendLine("     \"Description\": string,");
@@ -506,11 +465,10 @@ namespace OpenEdAI.API.Controllers
             sb.AppendLine("       { \"Title\": string, \"Description\": string, \"Tags\": [string] }");
             sb.AppendLine("     ]");
             sb.AppendLine("   }");
-            sb.AppendLine("4. Optimise `Tags` and `Lesson.Title` for real‑world search phrases.");
-            sb.AppendLine("5. If the request is unclear / violates policy, reply with:");
+            sb.AppendLine("3. Optimise Lesson:Title, Lesson:Description, and Lesson:Tags for real‑world search phrases.");
+            sb.AppendLine("4. If the request is unclear / violates policy, reply with:");
             sb.AppendLine("   {\"Warning\":\"<explanation>\"}");
             sb.AppendLine();
-            sb.AppendLine("### Produce the JSON now.");
             return sb.ToString();
         }
 
@@ -527,22 +485,33 @@ namespace OpenEdAI.API.Controllers
             sb.AppendLine($"- Education Level: {profile.EducationLevel}");
             sb.AppendLine($"- Preferred Content Types: {profile.PreferredContentTypes ?? "None"}");
             sb.AppendLine($"- Special Needs or Considerations: {profile.SpecialConsiderations ?? "None"}");
-            sb.AppendLine($"- Additional Learner Info: {profile.AdditionalConsiderations ?? "None"}");
+            sb.AppendLine($"- Key Interests & Background: {profile.AdditionalConsiderations ?? "None"}");
             sb.AppendLine();
             sb.AppendLine("### Course Parameters");
-            sb.AppendLine($"Topic: {input.Topic}");
-            sb.AppendLine($"Learner Experience Level: {input.ExperienceLevel}");
+            sb.AppendLine($"- Topic: {input.Topic}");
+            sb.AppendLine($"- User's experience with the topic: {input.ExperienceLevel}");
             if (!string.IsNullOrWhiteSpace(input.AdditionalContext))
             {
-                sb.AppendLine($"Additional User Context: {input.AdditionalContext}");
+                sb.AppendLine($"- Additional Context: {input.AdditionalContext}");
             }
             sb.AppendLine();
-            sb.AppendLine("### Requirements");
-            sb.AppendLine("1. **Prioritise learner profile** — lesson length, depth, and ordering must suit the stated education level **and** any special considerations.");
-            sb.AppendLine("   •  If profile hints at limited attention (e.g., ADHD), break dense ideas into 15‑25 minute micro‑lessons.");
-            sb.AppendLine("2. Single‑level structure (no chapters) ⇒ `Lessons[]` is a flat array.");
-            sb.AppendLine("3. Use plain, valid JSON *only* (no markdown, no commentary, no code‑fences).");
-            sb.AppendLine("4. Schema to follow exactly:");
+            sb.AppendLine("### Requirements:");
+            sb.AppendLine("1. Use the learner profile to personalize EVERYTHING: Titles, Descriptions, and Tags should reflect the user's background, preferences, and goals.");
+            sb.AppendLine("   - Include relatable examples or analogies based on profile interests.");
+            sb.AppendLine($"   - Adjust lesson depth and pacing to match at student at the {profile.EducationLevel} level" + 
+                                (!string.IsNullOrWhiteSpace(profile.SpecialConsiderations) ? 
+                                $" with special considerations: { profile.SpecialConsiderations}." : "."));
+            sb.AppendLine("   If the profile information suggests the user may have issues with the topic based on education, special needs, or any additional information, break dense ideas into 15‑25 minute micro‑lessons.");
+            sb.AppendLine("2. Infer missing details from the profile (such as the user's age/grade based on education level) to enrich content: select real-world search keywords and scenarios relevant to the learner.");
+            sb.AppendLine("   Pay close attention to any additional context, key interests, background, special needs, and education level when inferring titles, descriptions, and tags.");
+            sb.AppendLine("   Tags are 1-3 word phrases similar to hashtags to be used as search keywords.");
+            sb.AppendLine("   There should be a set of tags for the course and a set of tags for each lesson.");
+            sb.AppendLine("   - Example Tag patterns:");
+            sb.AppendLine("     * \"{Topic} for {ExperienceLevel}\"");
+            sb.AppendLine("     * \"{Topic} for people with {SpecialConsiderations}\"");
+            sb.AppendLine("     * \"{ExperienceLevel} {Topic} for {EducationLevel}\"");
+            sb.AppendLine("     * Add any other combinations that tie topic, experience, special needs, and education level.");
+            sb.AppendLine("3. Structure output EXACTLY as JSON matching schema:");
             sb.AppendLine("   {");
             sb.AppendLine("     \"Title\": string,");
             sb.AppendLine("     \"Description\": string,");
@@ -551,11 +520,10 @@ namespace OpenEdAI.API.Controllers
             sb.AppendLine("       { \"Title\": string, \"Description\": string, \"Tags\": [string] }");
             sb.AppendLine("     ]");
             sb.AppendLine("   }");
-            sb.AppendLine("5. Optimise all `Tags` and `Lesson.Title` fields as SEO phrases the learner would actually search.");
-            sb.AppendLine("6. If the topic is too broad or violates policy, reply with:");
+            sb.AppendLine("4. Optimize every Title and Tag for real-world search intent and learning objectives.");
+            sb.AppendLine("5. If unclear or policy-violating, respond with:");
             sb.AppendLine("   {\"Warning\":\"<explanation>\"}");
             sb.AppendLine();
-            sb.AppendLine("### Produce the JSON now."); 
             return sb.ToString();
         }
     }

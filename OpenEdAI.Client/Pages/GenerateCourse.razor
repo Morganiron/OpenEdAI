@@ -21,8 +21,6 @@
 		Welcome to the Course Generator! Based on your preferences, we'll use AI to create a personalized course outline!
 	</p>
 
-
-
 	@if (generatedPlan != null)
 	{
 		<CoursePlanDisplay Plan="generatedPlan" />
@@ -48,6 +46,7 @@
 	// Constant strings for local storage keys to persist data
 	private const string PlanStorageKey = "cached_generated_plan";
 	private const string ChatMessagesKey = "cached_chat_messages";
+	private const string InputStorageKey = "cached_course_input";
 
 	// Expiration time in hours (to remove stored items when returning to the page)
 	private const int StorageExpiration = 2;
@@ -56,6 +55,13 @@
 	{
 		await LoadGeneratedPlanAsync();
 		await LoadChatMessagesAsync();
+
+		// Attempt to restore lastInput as well
+		var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
+		if (!string.IsNullOrEmpty(cachedInput))
+		{
+			lastInput = JsonSerializer.Deserialize<CoursePersonalizationInput>(cachedInput);
+		}
 	}
 
 	private async Task HandleCourseInput(CoursePersonalizationInput input)
@@ -72,8 +78,9 @@
 				generatedPlan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
 				chatMessages.Clear();
 
-				// Save the new course plan in local storage
+				// Save the new course plan and the user input
 				await SaveGeneratedPlanAsync();
+				await JS.InvokeVoidAsync("localStorage.setItem", InputStorageKey, JsonSerializer.Serialize(lastInput));
 			}
 			else
 			{
@@ -115,11 +122,8 @@
 			Loader.Show();
 
 			Console.WriteLine("Sending adjustment request...");
-			Console.WriteLine($"User message: {userMessage}");
 
 			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
-			Console.WriteLine("Serialized generated plan:");
-			Console.WriteLine(serializedPlan);
 
 			var requestPayload = new
 			{
@@ -130,14 +134,10 @@
 			Console.WriteLine("Making POST request to /ai/adjust-course...");
 			var response = await Http.PostAsJsonAsync("ai/adjust-course", requestPayload);
 
-			Console.WriteLine($"Response received: {(int)response.StatusCode} {response.StatusCode}");
-
 			if (response.IsSuccessStatusCode)
 			{
 				var json = await response.Content.ReadAsStringAsync();
-				Console.WriteLine("Raw JSON from response:");
-				Console.WriteLine(json);
-
+				
 				var adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(json, new JsonSerializerOptions
 					{
 						PropertyNameCaseInsensitive = true
@@ -199,6 +199,7 @@
 		{
 			await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
 			await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+			await JS.InvokeVoidAsync("localStorage.removeItem", InputStorageKey);
 
 			// Reset the in-memory state
 			generatedPlan = null;
@@ -207,33 +208,37 @@
 			// Trigger a re-render of the current component
 			StateHasChanged();
 		}
-
 	}
-
 
 	private async Task SubmitCoursePlan()
 	{
 		Loader.Show();
 		try
 		{
+			// If lastiput is null (e.g., page refresh), try to pull it from storage
+			if (lastInput == null)
+			{
+				var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
+				if (!string.IsNullOrEmpty(cachedInput))
+				{
+					lastInput = JsonSerializer.Deserialize<CoursePersonalizationInput>(cachedInput);
+				}
+			}
+
 			var payload = new SubmitCourseRequest
 				{
-					UserInput = lastInput,
-					Plan = generatedPlan
+					Plan = generatedPlan,
+					UserInput = lastInput!
 				};
+
 			var response = await Http.PostAsJsonAsync("ai/submit-course", payload);
 
 			if (response.IsSuccessStatusCode)
 			{
 				var result = await response.Content.ReadFromJsonAsync<JsonElement>();
 				if (result.TryGetProperty("message", out var messageElement))
-				{
-					Console.WriteLine($"Backend message: {messageElement.GetString()}");
-				}
 
 				// TODO: Add a notification/popup to inform the user that the course is being finalized and they will be notified when it's ready.
-
-				// TODO: Add logic to send data to the backend for processing
 
 				// Clear the localstorage to no longer persist the input information
 				await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
