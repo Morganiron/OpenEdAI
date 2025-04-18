@@ -54,14 +54,13 @@
             {
                 if (hasProfileData)
                 {
+                    await Notification.NotifyAndAwait("Please generate your first course to complete your initial setup.");
                     Navigation.NavigateTo("/generate-course", forceLoad: false);
-                    Notification.Notify("Please generate your first course to complete your initial setup.");
                 }
                 else
                 {
+                    await Notification.NotifyAndAwait("Please complete your profile to begin setting up your personalized course.");
                     Navigation.NavigateTo("/profile", forceLoad: false);
-
-                    Notification.Notify("Please complete your profile to begin setting up your personalized course.");
                 }
             }
         }

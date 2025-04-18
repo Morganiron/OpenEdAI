@@ -33,10 +33,12 @@
 
 @Body
 
-@if(!string.IsNullOrEmpty(message)){
+@if(!string.IsNullOrEmpty(message))
+{
 	<div class="notification-overlay">
 		<div class="notification-popup">
 			<p>@message</p>
+			<button class="btn send-button" @onclick="OnOKClicked">OK</button>
 		</div>
 	</div>
 }
@@ -66,7 +68,7 @@
 
 	public void Dispose()
 	{
-		Notification.OnNotify -= ShowMessage;
+		Notification.OnNotify -= ShowNotification;
 
 		if (authHandler is not null)
 			AuthStateProvider.AuthenticationStateChanged -= authHandler;
@@ -74,20 +76,24 @@
 
 	protected override void OnInitialized()
 	{
-		Notification.OnNotify += ShowMessage;
+		Notification.OnNotify += ShowNotification;
 	}
 
-	private void ShowMessage(string msg)
+	private void ShowNotification(string msg)
 	{
+		// Handle the notification message
 		message = msg;
 		StateHasChanged();
+	}
 
-		// Auto-hide after 5 seconds
-		_ = Task.Delay(5000).ContinueWith(_ =>
-		{
-			message = null;
-			InvokeAsync(StateHasChanged);
-		});
+	private void OnOKClicked()
+	{
+		// Hide the popup
+		message = null;
+		StateHasChanged();
+
+		// Signal the back to Notify and await
+		Notification.Acknowledge();
 	}
 
 	private async Task SetAuthAndRouteState()

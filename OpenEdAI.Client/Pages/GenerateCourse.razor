@@ -11,6 +11,7 @@
 @inject LoadingService Loader
 @inject IJSRuntime JS
 @inject LogoutService LogoutService
+@inject NotificationService Notification
 
 <!-- Prevent navigation if required fields are not completed -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -238,7 +239,8 @@
 				var result = await response.Content.ReadFromJsonAsync<JsonElement>();
 				if (result.TryGetProperty("message", out var messageElement))
 
-				// TODO: Add a notification/popup to inform the user that the course is being finalized and they will be notified when it's ready.
+				// Show a popup to the user
+				await Notification.NotifyAndAwait("Your course is being finalized.\nThe dashboard will refresh in a few minutes when the AI is done working its magic!");
 
 				// Clear the localstorage to no longer persist the input information
 				await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
