@@ -3,6 +3,14 @@
 <div class="course-card">
 	<h3>@Course.Title</h3>
 	<p>@Course.Description</p>
+        <div class="progress-container">
+            <div class="progress-circle">
+                <span>@Progress.CompletionPercentage%</span>
+            </div>
+            <small>Completed</small>
+        </div>
+    </div>
+
 	<p><strong>Tags:</strong> @string.Join(", ", Course.Tags ?? new())</p>
 	<p><em>Created by: @Course.UserName</em></p>
 	<p><small>Updated: @Course.UpdateDate.ToShortDateString()</small></p>
@@ -10,4 +18,12 @@
 
 @code {
 	[Parameter] public CourseDTO Course { get; set; }
+	[Parameter] public CourseProgressDTO Progress { get; set; }
+
+	[Inject] private NavigationManager Navigation { get; set; }
+
+	private void NavigateToCourse()
+	{
+		Navigation.NavigateTo($"/course/{Course.CourseID}");
+	}
 }

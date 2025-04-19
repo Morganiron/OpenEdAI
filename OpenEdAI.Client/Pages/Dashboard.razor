@@ -3,7 +3,9 @@
 @using Microsoft.AspNetCore.Authorization
 @using OpenEdAI.Client.Models
 @using OpenEdAI.Client.Components
+@using OpenEdAI.Client.Services
 @inject Services.CourseService CourseService
+@inject Services.CourseProgressService ProgressService
 
 <h2>Your Enrolled Courses</h2>
 
@@ -23,16 +25,34 @@ else
 	<div class="course-list">
 		@foreach (var course in courses)
 		{
-			<CourseCard Course="course" />
+					<CourseCard Course="course" Progress="@GetProgressForCourse(course.CourseID)" />
+				}
 		}
 	</div>
 }
 
 @code {
 	private List<CourseDTO> courses;
+	private List<CourseProgressDTO> progressData;
 
 	protected override async Task OnInitializedAsync()
 	{
 		courses = await CourseService.GetEnrolledCoursesAsync();
+		progressData = await ProgressService.GetUserCourseProgressAsync();
+	}
+
+	private CourseProgressDTO GetProgressForCourse(int courseId)
+	{
+		return progressData.FirstOrDefault(p => p.CourseID == courseId)
+			?? new CourseProgressDTO
+				{
+					CourseID = courseId,
+					UserID = "",
+					UserName = "",
+					LessonsCompleted = 0,
+					CompletedLessons = new List<int>(),
+					CompletionPercentage = 0,
+					LastUpdated = DateTime.UtcNow
+				};
 	}
 }

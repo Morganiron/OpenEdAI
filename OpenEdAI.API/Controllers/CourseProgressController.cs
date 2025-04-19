@@ -19,7 +19,7 @@ namespace OpenEdAI.API.Controllers
             _context = context;
         }
 
-        // GET: api/CourseProgressDTO
+        // GET: api/CourseProgress
         [HttpGet]
         public async Task<ActionResult<IEnumerable<CourseProgressDTO>>> GetProgress()
         {
@@ -42,7 +42,37 @@ namespace OpenEdAI.API.Controllers
             return Ok(progressList);
         }
 
-        // GET: api/CourseProgressDTO/{id}
+        // GET: api/CourseProgress/user
+        [HttpGet("user")]
+        public async Task<ActionResult<IEnumerable<CourseProgressDTO>>> GetUserProgress()
+        {
+            // Get the user ID from the token
+            var userId = GetUserIdFromToken();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            // Get the progress for the user
+            var progressList = await _context.CourseProgress
+                .Include(cp => cp.Course)
+                .Where(cp => cp.UserID == userId)
+                .Select(cp => new CourseProgressDTO
+                {
+                    ProgressID = cp.ProgressID,
+                    UserID = cp.UserID,
+                    UserName = cp.UserName,
+                    CourseID = cp.CourseID,
+                    LessonsCompleted = cp.LessonsCompleted,
+                    CompletedLessons = cp.CompletedLessons,
+                    CompletionPercentage = cp.Course == null || cp.Course.Lessons.Count == 0 ? 0 : Math.Floor((double)cp.LessonsCompleted / cp.Course.Lessons.Count * 100),
+                    LastUpdated = cp.UpdateDate
+                })
+                .ToListAsync();
+
+            return Ok(progressList);
+        }
+
+
+        // GET: api/CourseProgress/{id}
         [HttpGet("{progressId}")]
         public async Task<ActionResult<CourseProgressDTO>> GetProgress(int progressId)
         {
@@ -67,7 +97,7 @@ namespace OpenEdAI.API.Controllers
             return Ok(progress);
         }
 
-        // POST: api/CourseProgressDTO
+        // POST: api/CourseProgress
         [HttpPost]
         public async Task<ActionResult<CourseProgressDTO>> CreateProgress(CreateCourseProgressDTO createDto)
         {
@@ -137,7 +167,7 @@ namespace OpenEdAI.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/CourseProgressDTO/{id}
+        // DELETE: api/CourseProgress/{id}
         [HttpDelete("{progressId}")]
         public async Task<IActionResult> DeleteProgress(int progressId)
         {
