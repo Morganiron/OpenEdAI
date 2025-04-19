@@ -55,8 +55,6 @@ namespace OpenEdAI.API.Services
                 ))
                 .ToString();
 
-            _logger.LogInformation("AI Search Plan User Prompt:\n{userPrompt}", (object)userPrompt);
-
             // Call OpenAI
             var messages = new[]
             {
