@@ -371,13 +371,23 @@ namespace OpenEdAI.API.Controllers
                         AdditionalConsiderations = profileEntity.AdditionalConsiderations
                     };
 
+                    // Get the Student in this scope
+                    var studentEntity = await scopedContext.Students.FindAsync([userId], token);
+
+                    // Make sure the student still exists
+                    if (studentEntity == null)
+                        throw new InvalidOperationException($"Student {userId} vanished mid-job!");
+
                     // Rebuild the course and lessons in this scope
                     var courseToSave = new Course(
                     plan.Title,
                     plan.Description,
                     plan.Tags,
                     userId,
-                    student.UserName);
+                    studentEntity.UserName);
+
+                    // Add the student to the course's enrolled students like in CreateCourse
+                    courseToSave.EnrolledStudents.Add(studentEntity);
 
                     // Call the AI to genreate the content links for all lessons
                     var searchPlans = await planSvc.GeneratePlanAsync(
@@ -388,27 +398,34 @@ namespace OpenEdAI.API.Controllers
                     );
 
                     // Execute each lesson's queries
-                    foreach (var lessonPlan in searchPlans)
+                    for (int i = 0; i < searchPlans.Count; i++)
                     {
+                        var sp = searchPlans[i];
+                        var originalLesson = plan.Lessons[i];
+
+
                         var contentLinks = await contentSearchSvc
                         .SearchContentLinksAsync(
                             userInput,
                             plan,
-                            lessonPlan,
+                            sp,
                             studentProfile,
                             token
                         );
 
                         var lesson = new Lesson(
-                            lessonPlan.LessonTitle,
-                            plan.Lessons.First(l => l.Title == lessonPlan.LessonTitle).Description,
+                            originalLesson.Title,
+                            originalLesson.Description,
                             contentLinks,
-                            plan.Lessons.First(l => l.Title == lessonPlan.LessonTitle).Tags,
-                            /* courseId placeholder */ 0
+                            originalLesson.Tags,
+                            courseID: 0
                             );
 
                         courseToSave.Lessons.Add(lesson);
                     }
+                    // Save the course and lessons to the database
+                    scopedContext.Courses.Add(courseToSave);
+                    await scopedContext.SaveChangesAsync(token);
                 }
                 catch (Exception ex)
                 {
@@ -417,7 +434,7 @@ namespace OpenEdAI.API.Controllers
                 }
             });
 
-            return Ok(new { message = "Course finalized successfully." });
+            return Ok();
 
         }
 
