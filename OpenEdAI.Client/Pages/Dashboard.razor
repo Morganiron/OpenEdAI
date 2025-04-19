@@ -7,29 +7,34 @@
 @inject Services.CourseService CourseService
 @inject Services.CourseProgressService ProgressService
 
-<h2>Your Enrolled Courses</h2>
+<div class="dashboard-grid">
+	<div class="column-1">
+	</div>
 
-@if (CourseService == null)
-{
-	<p>Loading...</p>
-}
-@if (courses == null){
-	<p>Loading...</p>
-}
-else if (!courses.Any())
-{
-	<p>You are not enrolled in any courses.</p>
-}
-else
-{
-	<div class="course-list">
-		@foreach (var course in courses)
-		{
+	<div class="column-2">
+	</div>
+	<div class="column-3">
+		<div class="course-cards-container">
+			<h2 class="course-cards-heading">Your Enrolled Courses</h2>
+			@if (courses == null)
+			{
+				<p>Loading courses...</p>
+			}
+			else if (!courses.Any())
+			{
+				<p>No courses.</p>
+			}
+			else
+			{
+				@foreach (var course in courses)
+				{
 					<CourseCard Course="course" Progress="@GetProgressForCourse(course.CourseID)" />
 				}
-		}
+			}
+		</div>
 	</div>
-}
+	
+</div>
 
 @code {
 	private List<CourseDTO> courses;
