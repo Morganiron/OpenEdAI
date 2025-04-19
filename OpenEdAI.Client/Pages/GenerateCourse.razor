@@ -72,7 +72,7 @@
 		{
 			Loader.Show();
 
-			var response = await Http.PostAsJsonAsync("ai/generate-course", input);
+			var response = await Http.PostAsync("ai/generate-course", JsonContent.Create(input));
 
 			if (response.IsSuccessStatusCode)
 			{
