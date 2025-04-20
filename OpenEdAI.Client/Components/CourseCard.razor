@@ -1,6 +1,6 @@
 ﻿@using OpenEdAI.Client.Models
 
-<div class="course-card">
+<div class="course-card" @onclick="NavigateToCourse" style="cursor:pointer;">
     <div class="course-card-header">
         <h2>@Course.Title</h2>
 
