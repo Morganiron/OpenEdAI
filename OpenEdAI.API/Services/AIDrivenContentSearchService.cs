@@ -1,6 +1,6 @@
-﻿using Google.Apis.Services;
+﻿using Google.Apis.CustomSearchAPI.v1;
+using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
-using Google.Apis.CustomSearchAPI.v1;
 using OpenEdAI.API.DTOs;
 
 
@@ -38,7 +38,7 @@ namespace OpenEdAI.API.Services
                 ApiKey = apiKey,
                 ApplicationName = "OpenEdAI"
             });
-            
+
         }
 
         // Generates an AI-driven search plan for the given course input and student profile
@@ -56,7 +56,7 @@ namespace OpenEdAI.API.Services
                     searchRequest.Q = q.Query;
                     searchRequest.Type = "video";
                     searchRequest.MaxResults = q.MaxResults;
-                    
+
                     var searchResponse = await searchRequest.ExecuteAsync(token);
                     rawLinks.AddRange(searchResponse.Items.Select(item => $"https://youtu.be/{item.Id.VideoId}"));
                 }

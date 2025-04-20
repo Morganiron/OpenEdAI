@@ -1,16 +1,15 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenEdAI.API.Filters;
-using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
-using Microsoft.AspNetCore.Http.HttpResults;
+using OpenEdAI.API.Filters;
+using OpenEdAI.API.Models;
 
 namespace OpenEdAI.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    
+
     public class CoursesController : BaseController
     {
         private ApplicationDbContext _context;
@@ -53,10 +52,10 @@ namespace OpenEdAI.API.Controllers
         [HttpGet("{courseId}")]
         public async Task<ActionResult<CourseDTO>> GetCourse(int courseId)
         {
-           var course = await _context.Courses
-                .Include(c => c.Lessons)
-                .Include(c => c.EnrolledStudents)
-                .FirstOrDefaultAsync(c => c.CourseID == courseId);
+            var course = await _context.Courses
+                 .Include(c => c.Lessons)
+                 .Include(c => c.EnrolledStudents)
+                 .FirstOrDefaultAsync(c => c.CourseID == courseId);
 
             if (course == null)
             {
@@ -180,7 +179,7 @@ namespace OpenEdAI.API.Controllers
             }
 
             // Only the course creator can update the course
-           if (!TryValidateUserId(course.UserID))
+            if (!TryValidateUserId(course.UserID))
             {
                 return Forbid();
             }

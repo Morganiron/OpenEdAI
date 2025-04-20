@@ -2,7 +2,6 @@
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using Newtonsoft.Json;
-using Microsoft.Extensions.Configuration;
 
 namespace OpenEdAI.API.Services
 {

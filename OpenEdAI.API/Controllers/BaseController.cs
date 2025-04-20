@@ -53,7 +53,7 @@ namespace OpenEdAI.API.Controllers
                 var handler = new JwtSecurityTokenHandler();
                 var jwtToken = handler.ReadToken(token) as JwtSecurityToken;
                 var roles = jwtToken?.Claims.Where(claim => claim.Type == "cognito:groups").Select(c => c.Value).ToList();
-                
+
                 // Return true if the user is in the AdminGroup
                 return roles != null && roles.Contains("AdminGroup");
             }

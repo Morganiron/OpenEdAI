@@ -31,10 +31,10 @@ namespace OpenEdAI.API.Models
         [NotMapped] // Exclude list from EF Core mapping, handled manually
         public List<int> CompletedLessons
         {   // If CompletedLessonsJson does not exist, create a new List
-            get => string.IsNullOrEmpty(CompletedLessonsJson) 
+            get => string.IsNullOrEmpty(CompletedLessonsJson)
                 ? new List<int>()
                 : JsonSerializer.Deserialize<List<int>>(CompletedLessonsJson);// If it does exist, deserialize the JSON
-            
+
             private set => CompletedLessonsJson = JsonSerializer.Serialize(value); // Serialize the list to JSON
         }
 
@@ -73,7 +73,7 @@ namespace OpenEdAI.API.Models
             {
                 current = JsonSerializer.Deserialize<List<int>>(CompletedLessonsJson);
             }
-            
+
 
             if (!current.Contains(lessonID))
             {

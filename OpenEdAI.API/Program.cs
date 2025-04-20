@@ -1,21 +1,16 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
+using Amazon.CognitoIdentityProvider;
+using Amazon.Extensions.NETCore.Setup;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using OpenAI;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
-using Amazon.Extensions.NETCore.Setup;
-using Amazon;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
-using Amazon.CognitoIdentityProvider;
-using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,7 +65,7 @@ if (!builder.Environment.IsDevelopment())
         builder.Configuration[secret.Key] = secret.Value;
     }
     // Retrieve OpenAI key
-var openAiKey = await secretsManagerService.GetOpenAiKeyAsync();
+    var openAiKey = await secretsManagerService.GetOpenAiKeyAsync();
     builder.Configuration["OpenAi_LearningPathKey"] = openAiKey;
 
 }
@@ -201,7 +196,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = "cognito:groups"
 
         };
-        
+
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>

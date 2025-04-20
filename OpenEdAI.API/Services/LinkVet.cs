@@ -64,7 +64,7 @@
             };
 
         public static void Initialize(ILoggerFactory factory) => _logger = factory.CreateLogger<LinkVet>();
-        
+
         // Link vetting
         public static async Task<bool> IsAcceptableAsync(string url, string requestedType, HttpClient http, CancellationToken ct)
         {
@@ -139,7 +139,7 @@
                 if (res.IsSuccessStatusCode)
                     return res.Content.Headers.ContentType?.MediaType;
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 _logger.LogWarning(ex, "HEAD request failed, falling back to GET");
             }

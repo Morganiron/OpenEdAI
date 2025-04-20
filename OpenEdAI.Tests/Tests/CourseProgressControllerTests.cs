@@ -1,16 +1,10 @@
 ﻿// CourseProgressControllerTests.cs
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 using OpenEdAI.API.Controllers;
 using OpenEdAI.API.DTOs;
 using OpenEdAI.API.Models;
-using OpenEdAI.API.Data;
 using OpenEdAI.Tests.TestHelpers;
 
 namespace OpenEdAI.Tests.Tests

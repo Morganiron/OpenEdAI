@@ -1,7 +1,4 @@
-﻿using System;
-using System.Text.Json;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,14 +7,12 @@ using Moq;
 using OpenEdAI.API.Controllers;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
-using OpenEdAI.API.Models;
 using OpenEdAI.API.Services;
 using OpenEdAI.Tests.TestHelpers;
-using Xunit;
 
 namespace OpenEdAI.Tests.Tests
 {
-    public class AIAssistantControllerTests: IDisposable
+    public class AIAssistantControllerTests : IDisposable
     {
         private readonly ApplicationDbContext _context;
         private readonly Mock<IBackgroundTaskQueue> _mockQueue;
@@ -26,7 +21,7 @@ namespace OpenEdAI.Tests.Tests
         private readonly Mock<ILogger<AIAssistantController>> _mockLogger;
         private readonly Mock<IConfiguration> _mockConfig;
 
-        public AIAssistantControllerTests() 
+        public AIAssistantControllerTests()
         {
             _context = InMemoryDbContextFactory.Create();
             _mockQueue = new();
@@ -60,7 +55,7 @@ namespace OpenEdAI.Tests.Tests
         {
             // Arrange: Set up the mock config with a valid API key
             _mockConfig.Setup(c => c["OpenAi:LearningPathKey"]).Returns("sk-test-key");
-            
+
             var ctrl = new AIAssistantController(
                 _context,
                 _mockConfig.Object,
@@ -86,7 +81,7 @@ namespace OpenEdAI.Tests.Tests
         {
             // Arrange: Set up the mock config with a valid API key
             _mockConfig.Setup(c => c["OpenAi:LearningPathKey"]).Returns("sk-test-key");
-            
+
             var ctrl = new AIAssistantController(
                 _context,
                 _mockConfig.Object,

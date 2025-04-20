@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
-using OpenEdAI.API.Filters;
 using OpenEdAI.API.Models;
 
 namespace OpenEdAI.API.Controllers
@@ -49,7 +48,7 @@ namespace OpenEdAI.API.Controllers
                     ProgressRecordIds = s.ProgressRecords.Select(p => p.ProgressID).ToList()
                 })
                 .FirstOrDefaultAsync();
-                
+
 
             if (studentDTO == null)
                 return NotFound("Student not found");
@@ -158,7 +157,7 @@ namespace OpenEdAI.API.Controllers
                 CompletionPercentage = p.Course == null || p.Course.Lessons.Count == 0 ? 0 : Math.Floor((double)p.LessonsCompleted / p.Course.Lessons.Count * 100),
                 LastUpdated = p.UpdateDate
             }).ToList();
-                
+
 
             if (progress == null || !progress.Any())
                 return NotFound();
@@ -195,7 +194,7 @@ namespace OpenEdAI.API.Controllers
             {
                 UserID = student.UserID,
                 Username = student.UserName
-            };            
+            };
 
             return CreatedAtAction(nameof(GetStudent), new { userid = student.UserID }, studentDto);
         }
@@ -347,7 +346,7 @@ namespace OpenEdAI.API.Controllers
             // Process courses created by the student
             foreach (var course in student.CreatorCourses.ToList())
             {
-                
+
                 // Reassign the course to the dummy user
                 course.ReassignCreator(dummyUserId, "Deleted User");
             }

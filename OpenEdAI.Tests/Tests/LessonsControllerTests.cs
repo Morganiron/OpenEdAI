@@ -1,16 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenEdAI.API.Controllers;
-using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
-using OpenEdAI.API.Models;
 using OpenEdAI.Tests.TestHelpers;
-using Xunit;
 
 namespace OpenEdAI.Tests.Tests
 {

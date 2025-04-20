@@ -1,8 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using OpenEdAI.Client.Models;
 
@@ -83,8 +81,9 @@ namespace OpenEdAI.Client.Services
             // Parse the token to get the expiration time
             var handler = new JwtSecurityTokenHandler();
 
-            try { 
-            var jwt = handler.ReadJwtToken(token);
+            try
+            {
+                var jwt = handler.ReadJwtToken(token);
 
                 // The 'exp' claim is in Unix time seconds
                 if (jwt.Payload.Exp.HasValue)

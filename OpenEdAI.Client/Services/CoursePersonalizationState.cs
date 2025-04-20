@@ -1,6 +1,6 @@
-﻿using OpenEdAI.Client.Models;
+﻿using System.Text.Json;
 using Microsoft.JSInterop;
-using System.Text.Json;
+using OpenEdAI.Client.Models;
 
 namespace OpenEdAI.Client.Services
 {
@@ -24,7 +24,7 @@ namespace OpenEdAI.Client.Services
             {
                 try
                 {
-                    Input = JsonSerializer.Deserialize<CoursePersonalizationInput>(json) ?? new() ;
+                    Input = JsonSerializer.Deserialize<CoursePersonalizationInput>(json) ?? new();
                 }
                 catch (JsonException ex)
                 {

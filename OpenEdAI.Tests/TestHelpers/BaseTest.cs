@@ -1,7 +1,5 @@
 ﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Identity.Client;
 using OpenEdAI.API.Data;
 
 namespace OpenEdAI.Tests.TestHelpers

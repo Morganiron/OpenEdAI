@@ -19,12 +19,12 @@ namespace OpenEdAI.API.Models
         [ForeignKey("Course")]
         public int CourseID { get; private set; }
         public virtual Course Course { get; private set; } // Ensures the lesson is linked to the Course
-        
+
         // Constructors
 
         internal Lesson() { } // EF Core required
 
-        public Lesson(string title, string description, List<string> contentLinks, List<string>tags, int courseID)
+        public Lesson(string title, string description, List<string> contentLinks, List<string> tags, int courseID)
         {
             Title = title;
             Description = description;

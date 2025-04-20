@@ -1,10 +1,8 @@
 ﻿// BaseControllerTests.cs
-using System;
-using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Xunit;
 using OpenEdAI.API.Controllers;
 
 namespace OpenEdAI.Tests.Tests

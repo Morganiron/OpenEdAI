@@ -8,7 +8,7 @@ namespace OpenEdAI.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    
+
     public class LessonsController : BaseController
     {
         private ApplicationDbContext _context;
@@ -108,7 +108,7 @@ namespace OpenEdAI.API.Controllers
 
             // Create a new Lesson entity using the provided data
             var lesson = new Lesson(createDto.Title, createDto.Description, createDto.ContentLinks, createDto.Tags, createDto.CourseID);
-            
+
             _context.Lessons.Add(lesson);
             await _context.SaveChangesAsync();
 

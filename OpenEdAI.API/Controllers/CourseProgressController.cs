@@ -1,15 +1,14 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenEdAI.API.Models;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
-using Microsoft.AspNetCore.Http.HttpResults;
+using OpenEdAI.API.Models;
 
 namespace OpenEdAI.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    
+
     public class CourseProgressController : BaseController
     {
         private ApplicationDbContext _context;
@@ -136,7 +135,7 @@ namespace OpenEdAI.API.Controllers
         [HttpPatch("{progressId}")]
         public async Task<IActionResult> PatchProgress(int progressId, [FromBody] MarkLessonCompleteDTO patchDto)
         {
-            
+
             // Get the progress with course and lessons
             var progress = await _context.CourseProgress
                 .Include(cp => cp.Course)

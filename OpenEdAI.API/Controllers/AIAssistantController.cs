@@ -1,13 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using OpenEdAI.API.Models;
-using OpenEdAI.API.Data;
-using OpenEdAI.API.DTOs;
+﻿using System.Text;
 using System.Text.Json;
-using System.Text;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
+using OpenEdAI.API.Data;
+using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Models;
 using OpenEdAI.API.Services;
 
 namespace OpenEdAI.API.Controllers
@@ -139,7 +139,7 @@ namespace OpenEdAI.API.Controllers
                 );
 
                 // Validate deserialization produced required fields
-                if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) || 
+                if (coursePlan == null || string.IsNullOrWhiteSpace(coursePlan.Title) ||
                     string.IsNullOrWhiteSpace(coursePlan.Description) || !coursePlan.Tags.Any() ||
                     coursePlan.Lessons == null || !coursePlan.Lessons.Any())
                 {
@@ -515,9 +515,9 @@ namespace OpenEdAI.API.Controllers
             sb.AppendLine("### Requirements:");
             sb.AppendLine("1. Use the learner profile to personalize EVERYTHING: Titles, Descriptions, and Tags should reflect the user's background, preferences, and goals.");
             sb.AppendLine("   - Include relatable examples or analogies based on profile interests.");
-            sb.AppendLine($"   - Adjust lesson depth and pacing to match at student at the {profile.EducationLevel} level" + 
-                                (!string.IsNullOrWhiteSpace(profile.SpecialConsiderations) ? 
-                                $" with special considerations: { profile.SpecialConsiderations}." : "."));
+            sb.AppendLine($"   - Adjust lesson depth and pacing to match at student at the {profile.EducationLevel} level" +
+                                (!string.IsNullOrWhiteSpace(profile.SpecialConsiderations) ?
+                                $" with special considerations: {profile.SpecialConsiderations}." : "."));
             sb.AppendLine("   If the profile information suggests the user may have issues with the topic based on education, special needs, or any additional information, break dense ideas into 15‑25 minute micro‑lessons.");
             sb.AppendLine("2. Infer missing details from the profile (such as the user's age/grade based on education level) to enrich content: select real-world search keywords and scenarios relevant to the learner.");
             sb.AppendLine("   Pay close attention to any additional context, key interests, background, special needs, and education level when inferring titles, descriptions, and tags.");

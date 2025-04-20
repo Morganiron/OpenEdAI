@@ -1,6 +1,6 @@
 ﻿using System.Net.Http.Json;
-using OpenEdAI.Client.Models;
 using Microsoft.AspNetCore.Components.Authorization;
+using OpenEdAI.Client.Models;
 
 namespace OpenEdAI.Client.Services
 {

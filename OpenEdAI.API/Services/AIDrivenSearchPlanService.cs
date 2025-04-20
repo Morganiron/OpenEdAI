@@ -46,7 +46,8 @@ namespace OpenEdAI.API.Services
                 .AppendLine()
                 .AppendLine("Lessons (as JSON array; each object includes Title, Description, and Tags):")
                 .AppendLine(JsonSerializer.Serialize(
-                    coursePlan.Lessons.Select(l => new {
+                    coursePlan.Lessons.Select(l => new
+                    {
                         LessonTitle = l.Title,
                         LessonDescription = l.Description,
                         Tags = l.Tags
@@ -235,7 +236,7 @@ namespace OpenEdAI.API.Services
                 sb.AppendLine("   - **Articles:** 2 × CustomSearch article (with exclusions -site:youtube.com -site:vimeo.com -site:dailymotion.com -site:facebook.com -site:.social)");
             if (prefs.Contains("Discussion forums"))
                 sb.AppendLine("   - **Discussion forums:** 2 × CustomSearch forum (same exclusions as Articles)");
-            
+
             sb.AppendLine();
 
             return sb.ToString();

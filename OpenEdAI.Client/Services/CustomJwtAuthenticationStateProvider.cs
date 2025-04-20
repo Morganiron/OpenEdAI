@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using OpenEdAI.Client.Models;
 
 namespace OpenEdAI.Client.Services
@@ -86,7 +86,7 @@ namespace OpenEdAI.Client.Services
 
                 var identity = new ClaimsIdentity(jwt.Claims, "cognito-jwt");
                 var user = new ClaimsPrincipal(identity);
-                
+
                 // Cache the current token for change detection
                 _previousToken = token;
                 return new AuthenticationState(user);

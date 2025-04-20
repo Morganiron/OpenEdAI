@@ -1,10 +1,8 @@
-﻿using System.Net.Http;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenEdAI.API.DTOs;
-using Microsoft.Extensions.Logging;
 
 namespace OpenEdAI.API.Controllers
 {

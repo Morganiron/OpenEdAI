@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Json;
+﻿using System.Net;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
 using OpenEdAI.API.Controllers;
 using OpenEdAI.API.DTOs;
-using Xunit;
 
 namespace OpenEdAI.Tests.Tests
 {
@@ -92,6 +86,7 @@ namespace OpenEdAI.Tests.Tests
 
             var logger = new Mock<ILogger<AuthController>>();
             var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+
 
             // Act: call the ExchangeCode method with a dummy code
             var actionResult = await ctrl.ExchangeCode(new AuthCodeExchangeRequest { Code = "foo" });
