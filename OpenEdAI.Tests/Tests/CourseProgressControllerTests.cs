@@ -1,18 +1,17 @@
-﻿using System;
+﻿// CourseProgressControllerTests.cs
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using OpenEdAI.API.Data;
-using OpenEdAI.API.Models;
-using OpenEdAI.Tests.TestHelpers;
-using Xunit;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Xunit;
 using OpenEdAI.API.Controllers;
 using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Models;
+using OpenEdAI.API.Data;
+using OpenEdAI.Tests.TestHelpers;
 
 namespace OpenEdAI.Tests.Tests
 {
@@ -20,184 +19,254 @@ namespace OpenEdAI.Tests.Tests
     {
         private readonly CourseProgressController _controller;
 
-        public CourseProgressControllerTests() : base() 
+        public CourseProgressControllerTests() : base()
         {
-            _controller = new CourseProgressController(_context);
-            _controller.ControllerContext = new ControllerContext
+            // Arrange: Initialize controller with a default valid user
+            _controller = new CourseProgressController(_context)
             {
-                // Ensure default user is set to "student-003" which has the most data
-                HttpContext = new DefaultHttpContext { User = GetMockUser("student-003") }
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = GetMockUser("student-003", "Student Three")
+                    }
+                }
             };
         }
 
-        // ==================== GET Tests ====================
+        // ==================== GET ALL ====================
 
         [Fact]
-        public async Task GetProgress_ReturnsListOfProgress()
+        public async Task GetProgress_ReturnsAllProgress()
         {
-            // Act: Retrieve the list of course progress records
+            // Act
             var result = await _controller.GetProgress();
 
-            // Assert: Ensure the result is OK and that thte list is not empty
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var progressList = Assert.IsAssignableFrom<IEnumerable<CourseProgressDTO>>(okResult.Value);
+            // Assert
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var list = Assert.IsAssignableFrom<IEnumerable<CourseProgressDTO>>(ok.Value);
+            Assert.NotEmpty(list);
+        }
 
-            Assert.NotEmpty(progressList);
+        // ==================== GET USER-SPECIFIC ====================
+
+        [Fact]
+        public async Task GetUserProgress_NoToken_ReturnsUnauthorized()
+        {
+            // Arrange: remove user identity
+            _controller.ControllerContext.HttpContext = new DefaultHttpContext();
+
+            // Act
+            var result = await _controller.GetUserProgress();
+
+            // Assert
+            Assert.IsType<UnauthorizedResult>(result.Result);
         }
 
         [Fact]
-        public async Task GetProgress_ValidId_ReturnsProgress()
+        public async Task GetUserProgress_ValidUser_ReturnsOnlyTheirProgress()
         {
-            // Arrange: Get an existing course progress record
-            var existingProgress = _context.CourseProgress.FirstOrDefault();
-            Assert.NotNull(existingProgress);
+            // Act
+            var result = await _controller.GetUserProgress();
 
-            // Act: Retrieve the progress record by ProgressID
-            var result = await _controller.GetProgress(existingProgress.ProgressID);
+            // Assert
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var list = Assert.IsAssignableFrom<IEnumerable<CourseProgressDTO>>(ok.Value);
+            Assert.All(list, dto => Assert.Equal("student-003", dto.UserID));
+        }
 
-            // Assert: Ensure the returned progress DTO matches the expected ProgressID
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var progressDto = Assert.IsType<CourseProgressDTO>(okResult.Value);
-            Assert.Equal(existingProgress.ProgressID, progressDto.ProgressID);
+        // ==================== GET BY ID ====================
+
+        [Fact]
+        public async Task GetProgressById_ValidId_ReturnsProgress()
+        {
+            // Arrange
+            var existing = _context.CourseProgress.First();
+
+            // Act
+            var result = await _controller.GetProgress(existing.ProgressID);
+
+            // Assert
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var dto = Assert.IsType<CourseProgressDTO>(ok.Value);
+            Assert.Equal(existing.ProgressID, dto.ProgressID);
         }
 
         [Fact]
-        public async Task GetProgress_InvalidId_ReturnsNotFound()
+        public async Task GetProgressById_InvalidId_ReturnsNotFound()
         {
-            // Act: Attempt to retrieve a progress record with an invalid ID
+            // Act
             var result = await _controller.GetProgress(-1);
 
-            // Assert: Expect a NotFound result
+            // Assert
             Assert.IsType<NotFoundResult>(result.Result);
         }
 
-        // ==================== CREATE Tests ====================
+        // ==================== CREATE ====================
 
         [Fact]
-        public async Task CreateProgress_ValidData_ReturnsCreatedProgress()
+        public async Task CreateProgress_ValidRequest_ReturnsCreated()
         {
-            // Arrange: Get an existing course for which to create progress
-            var course = _context.Courses.FirstOrDefault();
-            Assert.NotNull(course);
-
-            var createDto = new CreateCourseProgressDTO
+            // Arrange
+            var course = _context.Courses.First();
+            var dto = new CreateCourseProgressDTO
             {
                 UserID = "student-003",
                 UserName = "Student Three",
                 CourseID = course.CourseID
             };
 
-            // Act: Create the progress record
-            var result = await _controller.CreateProgress(createDto);
+            // Act
+            var result = await _controller.CreateProgress(dto);
 
-            // Assert: Verify that a CreatedAtAction result is returned with correct data
-            var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            var progressDto = Assert.IsType<CourseProgressDTO>(createdResult.Value);
-            Assert.Equal(createDto.UserID, progressDto.UserID);
-            Assert.Equal(createDto.CourseID, progressDto.CourseID);
-            Assert.Equal(0, progressDto.LessonsCompleted);
-            Assert.Empty(progressDto.CompletedLessons);
+            // Assert
+            var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+            var ret = Assert.IsType<CourseProgressDTO>(created.Value);
+            Assert.Equal(dto.UserID, ret.UserID);
+            Assert.Equal(dto.CourseID, ret.CourseID);
+            Assert.Empty(ret.CompletedLessons);
+            Assert.Equal(0, ret.LessonsCompleted);
         }
 
         [Fact]
         public async Task CreateProgress_InvalidCourse_ReturnsBadRequest()
         {
-            // Arrange: Use an invalid CourseID
-            var createDto = new CreateCourseProgressDTO
+            // Arrange
+            var dto = new CreateCourseProgressDTO
             {
                 UserID = "student-003",
                 UserName = "Student Three",
                 CourseID = -1
             };
 
-            // Act: Attempt to create a progress record for a non-existent course
-            var result = await _controller.CreateProgress(createDto);
+            // Act
+            var result = await _controller.CreateProgress(dto);
 
-            // Assert: Expect a BadRequest with the message "Course not found"
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.Equal("Course not found", badRequestResult.Value);
+            // Assert
+            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Equal("Course not found", bad.Value);
         }
 
-        // ==================== PATCH Tests ====================
+        [Fact]
+        public async Task CreateProgress_WrongUser_ReturnsForbid()
+        {
+            // Arrange: request userID mismatch
+            var course = _context.Courses.First();
+            var dto = new CreateCourseProgressDTO
+            {
+                UserID = "someone-else",
+                UserName = "Other",
+                CourseID = course.CourseID
+            };
+
+            // Act
+            var result = await _controller.CreateProgress(dto);
+
+            // Assert
+            Assert.IsType<ForbidResult>(result.Result);
+        }
+
+        // ==================== PATCH (COMPLETE LESSON) ====================
 
         [Fact]
-        public async Task PatchProgress_ValidLesson_CompletesLesson()
+        public async Task PatchProgress_ValidCompletion_ReturnsNoContent()
         {
-            // Arrange: Get a progress record from a course that has a lesson
+            // Arrange
             var progress = _context.CourseProgress
-                .Include(cp => cp.Course)
-                .ThenInclude(c => c.Lessons)
-                .FirstOrDefault(cp => cp.Course != null && cp.Course.Lessons.Any());
-            Assert.NotNull(progress);
-
-            int initialCompleted = progress.LessonsCompleted;
-
-            // Find a lesson in the course that has not yet been completed
-            var lesson = progress.Course.Lessons.FirstOrDefault(l => !progress.CompletedLessons.Contains(l.LessonID));
-            Assert.NotNull(lesson);
-
+                .Include(cp => cp.Course).ThenInclude(c => c.Lessons)
+                .First(cp => cp.Course.Lessons.Any());
+            var initialCount = progress.LessonsCompleted;
+            var lesson = progress.Course.Lessons
+                .First(l => !progress.CompletedLessons.Contains(l.LessonID));
             var patchDto = new MarkLessonCompleteDTO { LessonID = lesson.LessonID };
 
-            // Act: Mark the lesson as complete
+            // Act
             var result = await _controller.PatchProgress(progress.ProgressID, patchDto);
 
-            // Assert: Ensure the patch returns NoContent
+            // Assert
             Assert.IsType<NoContentResult>(result);
+            var updated = await _context.CourseProgress.FindAsync(progress.ProgressID);
+            Assert.Contains(lesson.LessonID, updated.CompletedLessons);
+            Assert.Equal(initialCount + 1, updated.LessonsCompleted);
+        }
 
-            // Reload the progress record and verify the lesson was added
-            var updatedProgress = await _context.CourseProgress
-                .Include(cp => cp.Course)
-                .ThenInclude(c => c.Lessons)
-                .FirstOrDefaultAsync(cp => cp.ProgressID == progress.ProgressID);
+        [Fact]
+        public async Task PatchProgress_InvalidProgressId_ReturnsNotFound()
+        {
+            // Arrange
+            var patchDto = new MarkLessonCompleteDTO { LessonID = 1 };
 
-            Assert.NotNull(updatedProgress);
-            Assert.Contains(lesson.LessonID, updatedProgress.CompletedLessons);
-            Assert.Equal(initialCompleted + 1, updatedProgress.LessonsCompleted);
+            // Act
+            var result = await _controller.PatchProgress(-1, patchDto);
+
+            // Assert
+            Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
         public async Task PatchProgress_InvalidLesson_ReturnsBadRequest()
         {
-            // Arrange: Get an existing progress record
+            // Arrange
             var progress = _context.CourseProgress
-                .Include(cp => cp.Course)
-                .ThenInclude(c => c.Lessons)
-                .FirstOrDefault(cp => cp.Course != null && cp.Course.Lessons.Any());
-            Assert.NotNull(progress);
-
-            // Use an invalid LessonID (one not in the course)
+                .Include(cp => cp.Course).ThenInclude(c => c.Lessons)
+                .First(cp => cp.Course.Lessons.Any());
             var patchDto = new MarkLessonCompleteDTO { LessonID = -1 };
 
-            // Act: Attempt to mark an invalid lesson as complete
+            // Act
             var result = await _controller.PatchProgress(progress.ProgressID, patchDto);
 
-            // Assert: Expect a BadRequest with the message "Lesson not found in course"
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.Equal("Lesson not found in course", badRequestResult.Value);
+            // Assert
+            var bad = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal("Lesson not found in course", bad.Value);
         }
 
-        // ==================== DELETE Tests ====================
-        
         [Fact]
-        public async Task DeleteProgress_ValidId_DeletesProgress()
+        public async Task PatchProgress_WrongUser_ReturnsForbid()
         {
-            // Arrange: Create a new progress record to ensure that deletion doesn't affect seeded data
-            var course = _context.Courses.FirstOrDefault();
-            Assert.NotNull(course);
+            // Arrange
+            var progress = _context.CourseProgress.First();
+            _controller.ControllerContext.HttpContext.User = GetMockUser("intruder");
+            var patchDto = new MarkLessonCompleteDTO { LessonID = 1 };
 
-            var progress = new CourseProgress("student-003", "Student Three", course.CourseID);
-            _context.CourseProgress.Add(progress);
-            await _context.SaveChangesAsync();
-            int progressId = progress.ProgressID;
+            // Act
+            var result = await _controller.PatchProgress(progress.ProgressID, patchDto);
 
-            // Act: Delete the progress record
-            var result = await _controller.DeleteProgress(progressId);
-
-            // Assert: Ensure the deletion returns NoContent and the record is removed
-            Assert.IsType<NoContentResult>(result);
-            var deletedProgress = await _context.CourseProgress.FindAsync(progressId);
-            Assert.Null(deletedProgress);
+            // Assert
+            Assert.IsType<ForbidResult>(result);
         }
 
+        // ==================== DELETE ====================
+
+        [Fact]
+        public async Task DeleteProgress_ValidId_ReturnsNoContent()
+        {
+            // Arrange
+            var course = _context.Courses.First();
+            var prog = new CourseProgress("student-003", "Student Three", course.CourseID);
+            _context.CourseProgress.Add(prog);
+            await _context.SaveChangesAsync();
+            var id = prog.ProgressID;
+
+            // Act
+            var result = await _controller.DeleteProgress(id);
+
+            // Assert
+            Assert.IsType<NoContentResult>(result);
+            Assert.Null(await _context.CourseProgress.FindAsync(id));
+        }
+
+        [Fact]
+        public async Task DeleteProgress_WrongUser_ReturnsForbid()
+        {
+            // Arrange
+            var prog = _context.CourseProgress.First();
+            _controller.ControllerContext.HttpContext.User = GetMockUser("other-user");
+
+            // Act
+            var result = await _controller.DeleteProgress(prog.ProgressID);
+
+            // Assert
+            Assert.IsType<ForbidResult>(result);
+        }
     }
 }
