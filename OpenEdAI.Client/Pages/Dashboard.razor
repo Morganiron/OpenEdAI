@@ -13,9 +13,16 @@
 
 	<div class="column-2">
 	</div>
+
 	<div class="column-3">
 		<div class="course-cards-container">
 			<h2 class="course-cards-heading">Your Enrolled Courses</h2>
+			<input class="fa-search course-search-input"
+				   type="text"
+				   placeholder="Search your courses..."
+				   value="searchQuery"
+				   @oninput="(e) => searchQuery = e.Value!.ToString()!" />
+
 			@if (courses == null)
 			{
 				<p>Loading courses...</p>
@@ -26,19 +33,40 @@
 			}
 			else
 			{
-				@foreach (var course in courses)
+				@foreach (var course in FilteredCourses)
 				{
 					<CourseCard Course="course" Progress="@GetProgressForCourse(course.CourseID)" />
 				}
 			}
 		</div>
 	</div>
-	
+
 </div>
 
 @code {
 	private List<CourseDTO> courses;
 	private List<CourseProgressDTO> progressData;
+	private string searchQuery = "";
+
+	private IEnumerable<CourseDTO> FilteredCourses
+	{
+		get
+		{
+			if (string.IsNullOrWhiteSpace(searchQuery))
+			{
+				return courses;
+			}
+
+			var searchTerms = searchQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+			return courses.Where(course =>
+				searchTerms.Any(term =>
+					(!string.IsNullOrEmpty(course.Title) && course.Title.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+					(course.Tags != null && course.Tags.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)))
+				)
+			);
+		}
+	}
 
 	protected override async Task OnInitializedAsync()
 	{
