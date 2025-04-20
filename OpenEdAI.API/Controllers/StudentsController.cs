@@ -99,6 +99,7 @@ namespace OpenEdAI.API.Controllers
             // Check if the student exists
             var student = await _context.Students
                 .Include(s => s.EnrolledCourses)
+                    .ThenInclude(c => c.Lessons)
                 .FirstOrDefaultAsync(s => s.UserID == userId);
 
             if (student == null)
