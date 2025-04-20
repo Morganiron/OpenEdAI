@@ -242,6 +242,7 @@
 			if (lastInput == null)
 			{
 				var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
+
 				if (!string.IsNullOrEmpty(cachedInput))
 				{
 					lastInput = JsonSerializer.Deserialize<CoursePersonalizationInput>(cachedInput);
@@ -258,9 +259,6 @@
 
 			if (response.IsSuccessStatusCode)
 			{
-				var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-				if (result.TryGetProperty("message", out var messageElement))
-
 				// Show a popup to the user
 				await Notification.NotifyAndAwait("Your course is being finalized.\nThe dashboard will refresh in a few minutes when the AI is done working its magic!");
 
