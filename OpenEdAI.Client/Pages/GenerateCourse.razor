@@ -13,6 +13,7 @@
 @inject LogoutService LogoutService
 @inject NotificationService Notification
 @inject StudentService StudentService
+@inject ILogger<GenerateCourse> Logger
 
 <!-- Warn about data loss on any navigation -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -63,7 +64,7 @@
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Generate-Course: Couldn't get student status - assuming completed. {ex}");
+			Logger.LogWarning($"Generate-Course: Couldn't get student status - assuming completed. {ex}");
 		}
 
 		await LoadGeneratedPlanAsync();
@@ -98,12 +99,12 @@
 			else
 			{
 				var error = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"Error generating course: {error}");
+				Logger.LogWarning($"Error generating course: {error}");
 			}
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Exception generating course: {ex.Message}");
+			Logger.LogError($"Exception generating course: {ex.Message}");
 		}
 		finally
 		{
@@ -144,8 +145,6 @@
 		{
 			Loader.Show();
 
-			Console.WriteLine("Sending adjustment request...");
-
 			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
 
 			var requestPayload = new
@@ -154,7 +153,6 @@
 				PreviousPlan = serializedPlan
 			};
 
-			Console.WriteLine("Making POST request to /ai/adjust-course...");
 			var response = await Http.PostAsJsonAsync("ai/adjust-course", requestPayload);
 
 			if (response.IsSuccessStatusCode)
@@ -181,7 +179,7 @@
 				}
 				else
 				{
-					Console.WriteLine("Deserialization returned null.");
+					Logger.LogError("Deserialization returned null.");
 					chatMessages.Add(new CoursePlanChat.ChatMessage
 						{
 							Text = "The adjustment was processed but no valid plan was returned.",
@@ -192,15 +190,14 @@
 			else
 			{
 				var error = await response.Content.ReadAsStringAsync();
-				Console.WriteLine("Error from backend:");
-				Console.WriteLine(error);
+				Logger.LogError("Error from backend:\n", error);
 
 				chatMessages.Add(new CoursePlanChat.ChatMessage { Text = "Error processing your request. Please try again.", IsUser = false });
 			}
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Exception in HandleUserChatMessage: {ex}");
+			Logger.LogError($"Exception in HandleUserChatMessage: {ex}");
 			chatMessages.Add(new CoursePlanChat.ChatMessage
 				{
 					Text = "An unexpected error occurred while sending your request.",
@@ -272,17 +269,15 @@
 			else
 			{
 				var error = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"Error submitting course: {error}");
+				Logger.LogError($"Error submitting course: {error}");
 			}
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Exception submitting course: {ex.Message}");
+			Logger.LogError($"Exception submitting course: {ex.Message}");
 		}
 		finally
 		{
-
-
 			Loader.Hide();
 		}
 	}
@@ -330,7 +325,7 @@
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Invalid plan format or exception: {ex.Message}");
+				Logger.LogError($"Invalid plan format or exception: {ex.Message}");
 			}
 
 			// If any of the above fails, clear the old storage
@@ -382,7 +377,7 @@
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Invalid chat format or exception: {ex.Message}");
+				Logger.LogError($"Invalid chat format or exception: {ex.Message}");
 			}
 
 			// Clear legacy or corrupted data

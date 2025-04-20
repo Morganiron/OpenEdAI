@@ -8,11 +8,13 @@ namespace OpenEdAI.Client.Services
     {
         private const string StorageKey = "course_personalization_input";
         private readonly IJSRuntime _js;
+        private readonly ILogger _logger;
         public CoursePersonalizationInput Input { get; set; } = new();
 
-        public CoursePersonalizationState(IJSRuntime js)
+        public CoursePersonalizationState(IJSRuntime js, ILogger logger)
         {
             _js = js;
+            _logger = logger;
         }
 
         public async Task LoadStateAsync()
@@ -26,7 +28,7 @@ namespace OpenEdAI.Client.Services
                 }
                 catch (JsonException ex)
                 {
-                    Console.WriteLine($"Error deserializing CoursePersonalizationInput: {ex.Message}");
+                    _logger.LogError($"Error deserializing CoursePersonalizationInput: {ex.Message}");
                     Input = new CoursePersonalizationInput();
                 }
             }

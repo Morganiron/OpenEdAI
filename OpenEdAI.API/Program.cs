@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
@@ -15,7 +16,6 @@ using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using Amazon.CognitoIdentityProvider;
 using OpenAI;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,7 +60,6 @@ builder.Services.AddCors(options =>
 // Conditionally load secrets from AWS Secrets Manager in not in Development. (hosted on AWS)
 if (!builder.Environment.IsDevelopment())
 {
-    Console.WriteLine("Non-development environment detected. Loading secrets from AWS Secrets Manager...");
     var secretsManagerService = builder.Services.BuildServiceProvider().GetRequiredService<AWSSecretsManagerService>();
 
     // Retrieve app secrets (ClientSecret, DefaultConnection, etc.)
@@ -265,13 +264,6 @@ app.UseHttpsRedirection();
 
 // Enable CORS
 app.UseCors("AllowFrontendDev");
-
-// Debug middleware to log request paths and authentication state.
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"Request Path: {context.Request.Path}, Authenticated: {context.User?.Identity?.IsAuthenticated}");
-    await next();
-});
 
 app.UseAuthentication();
 app.UseAuthorization();

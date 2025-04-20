@@ -68,8 +68,6 @@ namespace OpenEdAI.API.Services
             var raw = resp.Choices[0].Message.Content.GetRawText();
             var json = NormalizePayload(raw);
 
-            _logger.LogInformation("AI Search Plan JSON:\n{json}", (object)json);
-
             try
             {
                 return JsonSerializer.Deserialize<List<LessonSearchPlanDTO>>(json,

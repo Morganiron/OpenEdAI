@@ -13,16 +13,18 @@ namespace OpenEdAI.Client.Services
         private readonly IJSRuntime _js;
         private readonly HttpClient _http;
         private Timer _refreshTimer;
+        private readonly ILogger<TokenManager> _logger;
 
         // Event that other components/services can subscribe to, to see when the token changes
         public event Action OnTokenChanged;
         // Event for when a token refresh fails (no refresh token or other error)
         public event Action OnTokenRefreshFailed;
 
-        public TokenManager(IJSRuntime js, HttpClient http)
+        public TokenManager(IJSRuntime js, HttpClient http, ILogger<TokenManager> logger)
         {
             _js = js;
             _http = http;
+            _logger = logger;
         }
 
         // Gets the token from localStorage
@@ -48,7 +50,7 @@ namespace OpenEdAI.Client.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error validating token: {ex.Message}");
+                _logger.LogError(ex, "Error validating token:");
                 return false;
             }
         }
@@ -101,25 +103,22 @@ namespace OpenEdAI.Client.Services
 
                     _refreshTimer?.Dispose();
                     _refreshTimer = new Timer(async _ => await RefreshTokenAsync(), null, delay, Timeout.InfiniteTimeSpan);
-                    Console.WriteLine($"Scheduled token refresh in {delay.TotalSeconds} seconds.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error scheduling token refresh: {ex.Message}");
+                _logger.LogError(ex, "Error scheduling token refresh:");
             }
         }
 
         // Calls the refresh endpoint to get a new access token (and refresh token) and updates the stored token
         public async Task RefreshTokenAsync()
         {
-            Console.WriteLine("\nEntered RefreshTokenAsync");
             try
             {
                 var refreshToken = await _js.InvokeAsync<string>("localStorage.getItem", "refresh_token");
                 if (string.IsNullOrWhiteSpace(refreshToken) || refreshToken == "null")
                 {
-                    Console.WriteLine("No refresh token found. User may need to log in again.");
                     OnTokenRefreshFailed?.Invoke();
                     await ClearTokensAsync();
                     return;
@@ -134,7 +133,6 @@ namespace OpenEdAI.Client.Services
                 if (response.IsSuccessStatusCode)
                 {
                     var tokenResponseJson = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"Token refresh response: {tokenResponseJson}");
 
                     // Deserialize the refreshed tokens
                     var tokenResponse = JsonSerializer.Deserialize<AuthTokenResponse>(
@@ -142,7 +140,6 @@ namespace OpenEdAI.Client.Services
 
                     if (tokenResponse != null && !string.IsNullOrWhiteSpace(tokenResponse.AccessToken) && tokenResponse.AccessToken != "null")
                     {
-                        Console.WriteLine("Token refresh successful.");
                         // Store the new token and reschedule the refresh
                         await SetTokenAsync(tokenResponse.AccessToken);
 
@@ -154,21 +151,20 @@ namespace OpenEdAI.Client.Services
                     }
                     else
                     {
-                        Console.WriteLine("Failed to parse refreshed token.");
                         OnTokenRefreshFailed?.Invoke();
                         await ClearTokensAsync();
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Token refresh failed with status: " + response.StatusCode);
+                    _logger.LogWarning("Token refresh failed with status: " + response.StatusCode);
                     OnTokenRefreshFailed?.Invoke();
                     await ClearTokensAsync();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error refreshing token: {ex.Message}");
+                _logger.LogError(ex, "Error refreshing token:");
                 OnTokenRefreshFailed?.Invoke();
                 await ClearTokensAsync();
             }

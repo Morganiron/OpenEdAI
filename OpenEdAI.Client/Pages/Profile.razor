@@ -13,6 +13,7 @@
 @inject StudentProfileState StudentProfileState
 @inject IJSRuntime JS
 @inject TokenManager TokenManager
+@inject ILogger<Profile> Logger
 
 <!-- Prevent navigation if required fields are not completed -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -136,7 +137,6 @@
     private string errorMessage = string.Empty;
     private ProfileModel profileModel = new ProfileModel();
     private EditContext editContext;
-    private bool isLoggingOut = false;
 
     // Editing flags for each field
     private bool isEditingAdditionalConsiderations = false;
@@ -243,7 +243,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading profile: {ex.Message}");
+            Logger.LogError(ex, "Error loading profile");
         }
         finally
         {
@@ -295,22 +295,9 @@
         // Notify the EditContext of the change
         editContext.NotifyValidationStateChanged();
 
-        Console.WriteLine($"Special Consideration changed: {profileModel.SpecialConsiderations}");
         // Save the state to local storage
         await StudentProfileState.SaveStateAsync();
         StateHasChanged();
-    }
-
-    private void DumpValidationMessages()
-    {
-        if (editContext != null)
-        {
-            var messages = editContext.GetValidationMessages();
-            foreach (var message in messages)
-            {
-                Console.WriteLine("Validation Message: " + message);
-            }
-        }
     }
 
     private async Task HandleValidSubmit()
@@ -325,8 +312,6 @@
         {
             profileModel.AdditionalConsiderations = " ";
         }
-
-        DumpValidationMessages();
 
         Loader.Show();
         try
@@ -356,7 +341,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving profile: {ex.Message}");
+            Logger.LogError(ex,"Error saving profile");
         }
         finally
         {

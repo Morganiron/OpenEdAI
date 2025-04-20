@@ -9,6 +9,7 @@
 @inject IJSRuntime JS
 @inject Services.TokenManager TokenManager
 @inject Services.StudentService StudentService
+@inject ILogger<AuthCallback> Logger
 
 <GlobalLoading /> 
 
@@ -21,7 +22,6 @@
 		var existingToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
 		if (!string.IsNullOrWhiteSpace(existingToken) && existingToken != "null" && TokenManager.IsTokenValid(existingToken))
 		{
-			Console.WriteLine("[AuthCallback] Existing access token found. Redirecting to dashboard.");
 			_hasExchangedCode = true;
 			await DeterminePostAuthNavigation();
 			return;
@@ -30,7 +30,6 @@
 		// Prevent multiple code exchanges
 		if (_hasExchangedCode)
 		{
-			Console.WriteLine("[AuthCallback] _hasExchangedCode is true. Redirecting to dashboard.");
 			Navigation.NavigateTo("/dashboard", replace: true);
 			return;
 		}
@@ -45,18 +44,14 @@
 		// If there is no code, clear the URL to avoid duplicate exchanges and redirect to the landing page
 		if (string.IsNullOrEmpty(code))
 		{
-			Console.WriteLine("No code found in query string. Redirecting to landing page");
 			Navigation.NavigateTo("/", forceLoad: true);
 			return;
 		}
 
 		try
 		{
-			Console.WriteLine($"Sending code to backend for exchange: {code}");
-
 			var payload = new AuthCodeExchangeRequest { Code = code };
 			var payloadJson = JsonSerializer.Serialize(payload);
-			Console.WriteLine($"Payload being sent to /auth/exchange: {payloadJson}"); 
 
 			var response = await Http.PostAsJsonAsync("auth/exchange", payload);
 
@@ -64,7 +59,6 @@
 			{
 				// Read the raw JSON response for debugging
 				var tokenJson = await response.Content.ReadAsStringAsync();
-				Console.WriteLine("Received token response: " + tokenJson);
 
 				// Deserialize using case-insensitive property names
 				var token = JsonSerializer.Deserialize<AuthTokenResponse>(
@@ -74,11 +68,7 @@
 
 				if (token != null)
 				{
-					Console.WriteLine("Parsed AccessToken: " + token.AccessToken);
-					Console.WriteLine("Parsed RefreshToken: " + token.RefreshToken);
-
 					// Clear any old tokens before storing the new ones
-					Console.WriteLine("Clearing old tokens...");
 					await ClearTokensAsync();
 
 					// Store the access token using the TokenManager
@@ -90,43 +80,30 @@
 						await JS.InvokeVoidAsync("localStorage.setItem", "refresh_token", token.RefreshToken);
 					}
 
-					Console.WriteLine("Tokens stored successfully.");
-
-					// Debug: Read them back and log
-					var storedAccessToken = await JS.InvokeAsync<string>("localStorage.getItem", "access_token");
-					var storedRefreshToken = await JS.InvokeAsync<string>("localStorage.getItem", "refresh_token");
-
 					_hasExchangedCode = true;
-					Console.WriteLine("[AuthCallback] _hasExchangedCode = true");
-
-					Console.WriteLine($"[AuthCallback] Stored access_token: {storedAccessToken}");
-					Console.WriteLine($"[AuthCallback] Stored refresh_token: {storedRefreshToken}");
 
 					// Wait for a second before redirecting to give the JS time to store the tokens
-					Console.WriteLine("Waiting for 200ms before redirecting...");
 					await Task.Delay(200);
 					// Redirect accordingly
 					await DeterminePostAuthNavigation();
 				}
 				else
 				{
-					Console.WriteLine("Received null token object.");
+					Logger.LogWarning("Received null token object.");
 					Navigation.NavigateTo("/", forceLoad: false);
 				}
 
 			}
 			else
 			{
-				Console.WriteLine($"[AuthCallback] Token exchange failed. Status: {response.StatusCode}");
+				Logger.LogWarning($"[AuthCallback] Token exchange failed. Status: {response.StatusCode}");
 				var errorContent = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"[AuthCallback] Error content: {errorContent}");
-				Console.WriteLine($"[AuthCallback] Redirecting to landing page.");
 				Navigation.NavigateTo("/", forceLoad: false);
 			}
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Exception during token exchange: {ex.Message}");
+			Logger.LogError($"Exception during token exchange: {ex.Message}");
 			Navigation.NavigateTo("/", forceLoad: false);
 		}
 		finally
@@ -145,30 +122,26 @@
 
 			if (student == null)
 			{
-				Console.WriteLine("Student not found. Redirecting to landing page.");
 				Navigation.NavigateTo("/", replace: true);
 				return;
 			}
 
 			if (!student.HasCompletedSetup && student.Profile == null)
 			{
-				Console.WriteLine("Student has not completed setup. Redirecting to profile page.");
 				Navigation.NavigateTo("/profile", replace: true);
 			}
 			else if (!student.HasCompletedSetup)
 			{
-				Console.WriteLine("Student has completed profile, but not completed setup. Redirecting to generate-course page.");
 				Navigation.NavigateTo("/generate-course", replace: true);
 			}
 			else
 			{
-				Console.WriteLine("Student setup complete. Redirecting to dashboard.");
 				Navigation.NavigateTo("/dashboard", replace: true);
 			}
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"Error during post-authentication navigation: {ex.Message}");
+			Logger.LogError($"Error during post-authentication navigation: {ex.Message}");
 			Navigation.NavigateTo("/", forceLoad: false);
 		}
 		finally
@@ -180,7 +153,6 @@
 	// Helper method to clear old tokens from localStorage
 	private async Task ClearTokensAsync()
 	{
-		Console.WriteLine("Clearing old tokens from localStorage...");
 		await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
 		await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
 	}

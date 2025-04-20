@@ -99,7 +99,7 @@ namespace OpenEdAI.API.Controllers
 
             if (chatResponse?.Choices == null || chatResponse.Choices.Count == 0)
             {
-                _logger.LogError("No output received from OpenAI API in GenerateCourse.");
+                _logger.LogWarning("No output received from OpenAI API in GenerateCourse.");
                 return StatusCode(500, "No output received from OpenAI API.");
             }
 

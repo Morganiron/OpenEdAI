@@ -114,13 +114,11 @@
 	private async Task Logout()
 	{
 		LogoutService.StartLogout();
-		Console.WriteLine("Logging out: Clearing stored tokens.");
 		// Clear the tokens from localStorage
 		await JS.InvokeVoidAsync("localStorage.removeItem", "access_token");
 		await JS.InvokeVoidAsync("localStorage.removeItem", "refresh_token");
 
 		// Redirect to the Cognito logout URL
-		Console.WriteLine("Redirecting to Cognito logout...");
 		Navigation.NavigateTo(Auth.CognitoLogoutUrl, forceLoad: true);
 	}
 

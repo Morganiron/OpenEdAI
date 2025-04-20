@@ -12,11 +12,12 @@ namespace OpenEdAI.Client.Services
         private readonly IJSRuntime _js;
         private readonly TokenManager _tokenManager;
         private readonly NavigationManager _navigation;
+        private readonly ILogger<CustomJwtAuthenticationStateProvider> _logger;
 
         // String to store the previous token to detect changes
         private string? _previousToken;
 
-        public CustomJwtAuthenticationStateProvider(IJSRuntime js, TokenManager tokenManager, NavigationManager navigation, AuthConfig authConfig)
+        public CustomJwtAuthenticationStateProvider(IJSRuntime js, TokenManager tokenManager, NavigationManager navigation, AuthConfig authConfig, ILogger<CustomJwtAuthenticationStateProvider> logger)
         {
             _js = js;
             _tokenManager = tokenManager;
@@ -29,7 +30,6 @@ namespace OpenEdAI.Client.Services
 
                 if (token != _previousToken)
                 {
-                    Console.WriteLine("[CustomJwtAuthStateProvider] Token changed, notifying auth state changed.");
                     _previousToken = token;
                     NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
                 }
@@ -38,18 +38,16 @@ namespace OpenEdAI.Client.Services
             // Subscribe to token refresh failures
             _tokenManager.OnTokenRefreshFailed += () =>
             {
-                Console.WriteLine("[CustomJwtAuthStateProvider] Token refresh failed, logging out");
                 // Redirect to the login page
                 _navigation.NavigateTo(authConfig.CognitoLoginUrl, forceLoad: true);
             };
-            
+            _logger = logger;
         }
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
             // Read token from localStorage
             var token = await _js.InvokeAsync<string>("localStorage.getItem", "access_token");
-            Console.WriteLine($"[CustomJwtAuthStateProvider] token from local_Storage: {token}");
 
             if (string.IsNullOrWhiteSpace(token) || token == "null")
             {
@@ -67,7 +65,6 @@ namespace OpenEdAI.Client.Services
                 // Check if the token is expired
                 if (jwt.ValidTo < DateTime.UtcNow)
                 {
-                    Console.WriteLine("[CustomJwtAuthStateProvider] Token is expired");
                     // Trigger a refresh
                     await _tokenManager.RefreshTokenAsync();
 
@@ -75,7 +72,6 @@ namespace OpenEdAI.Client.Services
                     token = await _js.InvokeAsync<string>("localStorage.getItem", "access_token");
                     if (string.IsNullOrWhiteSpace(token) || token == "null")
                     {
-                        Console.WriteLine("[CustomJwtAuthStateProvider] Token refresh failed.");
                         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
                     }
                     jwt = handler.ReadJwtToken(token);
@@ -84,7 +80,6 @@ namespace OpenEdAI.Client.Services
                 // Skip re-parsing and avoid unnecessary state changes if the token hasn't changed
                 if (_previousToken == token)
                 {
-                    Console.WriteLine("[CustomJwtAuthStateProvider] Token has not changed, skipping update.");
                     var cachedClaims = new ClaimsIdentity(ParseClaims(token), "cognito-jwt");
                     return new AuthenticationState(new ClaimsPrincipal(cachedClaims));
                 }
@@ -98,7 +93,7 @@ namespace OpenEdAI.Client.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[CustomJwtAuthStateProvider] Exception parsing token: {ex.Message}");
+                _logger.LogError(ex, "[CustomJwtAuthStateProvider] Exception parsing token");
 
                 // If they token is invalid, treat as anonymous
                 var anonymous = new ClaimsPrincipal(new ClaimsIdentity());

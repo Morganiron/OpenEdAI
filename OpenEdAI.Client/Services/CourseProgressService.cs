@@ -37,9 +37,7 @@ namespace OpenEdAI.Client.Services
                 UserName = user.FindFirst("username")?.Value!,
                 CourseID = courseId,
             };
-            Console.WriteLine($"Data being sent to API: {createDto.UserID}, {createDto.UserName}, {createDto.CourseID}");
             var resp = await _httpClient.PostAsJsonAsync("api/CourseProgress", createDto);
-            Console.WriteLine($"Response from API: {resp.Content}");
             resp.EnsureSuccessStatusCode();
             return await resp.Content.ReadFromJsonAsync<CourseProgressDTO>()!;
         }

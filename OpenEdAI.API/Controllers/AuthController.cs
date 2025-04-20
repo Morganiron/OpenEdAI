@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenEdAI.API.DTOs;
+using Microsoft.Extensions.Logging;
 
 namespace OpenEdAI.API.Controllers
 {
@@ -16,14 +17,16 @@ namespace OpenEdAI.API.Controllers
         private readonly string _clientSecret;
         private readonly string _redirectUri;
         private readonly string _tokenEndpoint;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IConfiguration config, IHttpClientFactory httpClientFactory)
+        public AuthController(IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger)
         {
             _http = httpClientFactory.CreateClient();
             _clientId = config["AWS:Cognito:AppClientId"];
             _clientSecret = config["AWS:Cognito:ClientSecret"];
             _redirectUri = config["AWS:Cognito:RedirectUri"];
             _tokenEndpoint = $"https://{config["AWS:Cognito:Domain"]}/oauth2/token";
+            _logger = logger;
         }
 
         // POST: /auth/exchange - Exchange Cognito auth code for tokens
@@ -31,11 +34,6 @@ namespace OpenEdAI.API.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<AuthTokenResponse>> ExchangeCode([FromBody] AuthCodeExchangeRequest request)
         {
-            // debug
-            Console.WriteLine("Entered ExchangeCode endpoint.");
-
-            Console.WriteLine($"\n\nAWS:Cognito:AppClientId = {_clientId}\nAWS:Cognito:ClientSecret = {_clientSecret}\nAWS:Cognito:RedirectUri = {_redirectUri}\ntokenEndpoint = {_tokenEndpoint}\n\n", LogLevel.Debug);
-
             // Prepare Basic Auth credentials for Cognito
             var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_clientId}:{_clientSecret}"));
 
@@ -56,13 +54,12 @@ namespace OpenEdAI.API.Controllers
             var res = await _http.SendAsync(req);
             if (!res.IsSuccessStatusCode)
             {
-                Console.WriteLine("Token exchange failed with status: " + res.StatusCode);
+                _logger.LogError("Token exchange failed with status: " + res.StatusCode);
                 return Unauthorized("Failed to exchange code for token");
             }
 
             // Read the raw JSON response for debugging
             var json = await res.Content.ReadAsStringAsync();
-            Console.WriteLine("Token exchange response: " + json);
 
             // Parse response and return tokens
             var content = await res.Content.ReadFromJsonAsync<JsonElement>();
@@ -76,10 +73,6 @@ namespace OpenEdAI.API.Controllers
                 refreshToken = refreshTokenElement.GetString() ?? "";
             }
 
-            Console.WriteLine("Parsed AccessToken: " + accessToken);
-            Console.WriteLine("Parsed IdToken: " + idToken);
-            Console.WriteLine("Parsed RefreshToken: " + refreshToken);
-
             return new AuthTokenResponse
             {
                 AccessToken = accessToken ?? "",
@@ -92,8 +85,6 @@ namespace OpenEdAI.API.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<AuthTokenResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
-            Console.WriteLine("Entered RefreshToken endpoint.");
-
             // Prepare the credentials
             var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_clientId}:{_clientSecret}"));
 
@@ -112,21 +103,17 @@ namespace OpenEdAI.API.Controllers
             var res = await _http.SendAsync(req);
             if (!res.IsSuccessStatusCode)
             {
-                Console.WriteLine("Token refresh failed with status: " + res.StatusCode);
+                _logger.LogError("Token refresh failed with status: " + res.StatusCode);
                 return Unauthorized("Failed to refresh token");
             }
 
             var json = await res.Content.ReadAsStringAsync();
-            Console.WriteLine("Refresh token response: " + json);
 
             var content = await res.Content.ReadFromJsonAsync<JsonElement>();
             var accessToken = content.GetProperty("access_token").GetString();
             var idToken = content.GetProperty("id_token").GetString();
 
             var refreshToken = content.TryGetProperty("refresh_token", out JsonElement rtElement) ? rtElement.GetString() : null;
-
-            Console.WriteLine("Parsed refreshed AccessToken: " + accessToken);
-            Console.WriteLine("Parsed refreshed IdToken: " + idToken);
 
             return new AuthTokenResponse
             {

@@ -8,12 +8,14 @@ namespace OpenEdAI.Client.Services
     {
         private const string StorageKey = "student_profile_data";
         private readonly IJSRuntime _js;
+        private readonly ILogger _logger;
 
         public StudentProfileDTO ProfileDTO { get; set; } = new();
 
-        public StudentProfileState(IJSRuntime js)
+        public StudentProfileState(IJSRuntime js, ILogger logger)
         {
             _js = js;
+            _logger = logger;
         }
 
         public async Task LoadStateAsync()
@@ -27,7 +29,7 @@ namespace OpenEdAI.Client.Services
                 }
                 catch (JsonException ex)
                 {
-                    Console.WriteLine($"Error deserializing StudentProfileDTO: {ex.Message}");
+                    _logger.LogError(ex, "Error deserializing StudentProfileDTO:");
                     ProfileDTO = new StudentProfileDTO();
                 }
             }

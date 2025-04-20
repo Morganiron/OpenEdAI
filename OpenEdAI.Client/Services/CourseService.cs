@@ -9,12 +9,14 @@ namespace OpenEdAI.Client.Services
         private readonly HttpClient _http;
         private readonly AuthenticationStateProvider _authStateProvider;
         private readonly LoadingService _loader;
+        private readonly ILogger<CourseService> _logger;
 
-        public CourseService(HttpClient http, AuthenticationStateProvider authStateProvider, LoadingService loader)
+        public CourseService(HttpClient http, AuthenticationStateProvider authStateProvider, LoadingService loader, ILogger<CourseService> logger)
         {
             _http = http;
             _authStateProvider = authStateProvider;
             _loader = loader;
+            _logger = logger;
         }
 
         public async Task<List<CourseDTO>> GetEnrolledCoursesAsync()
@@ -44,12 +46,12 @@ namespace OpenEdAI.Client.Services
             }
             catch (HttpRequestException ex)
             {
-                Console.WriteLine($"API error: {ex.Message}");
+                _logger.LogError($"API error: {ex.Message}");
                 return new List<CourseDTO>();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error: {ex.Message}");
+                _logger.LogError($"Unexpected error: {ex.Message}");
                 return new List<CourseDTO>();
             }
             finally
