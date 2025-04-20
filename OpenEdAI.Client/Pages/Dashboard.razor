@@ -43,7 +43,7 @@
 	protected override async Task OnInitializedAsync()
 	{
 		courses = await CourseService.GetEnrolledCoursesAsync();
-		progressData = await ProgressService.GetUserCourseProgressAsync();
+		progressData = await ProgressService.GetUserProgressAsync();
 	}
 
 	private CourseProgressDTO GetProgressForCourse(int courseId)

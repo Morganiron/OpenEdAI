@@ -58,5 +58,18 @@ namespace OpenEdAI.Client.Services
                 _loader.Hide();
             }
         }
+
+        public async Task<CourseDTO> GetCourseByIdAsync(int id)
+        {
+            _loader.Show();
+            try
+            {
+                return await _http.GetFromJsonAsync<CourseDTO>($"api/courses/{id}");
+            }
+            finally
+            {
+                _loader.Hide();
+            }
+        }
     }
 }

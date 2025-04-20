@@ -1,0 +1,109 @@
+﻿@page "/course/{courseId:int}"
+@attribute [Authorize]
+@using OpenEdAI.Client.Models
+@using OpenEdAI.Client.Components
+@using OpenEdAI.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
+@inject CourseService CourseService
+@inject LessonService LessonService
+@inject CourseProgressService ProgressService
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject LoadingService Loader
+@inject IJSRuntime JS
+@inject LogoutService LogoutService
+@inject NotificationService Notification
+
+<h1>Course Details</h1>
+
+@if (isLoading)
+{
+	<p>Loading course...</p>
+}
+else if (Course == null)
+{
+	<p class="error-text">Course not found</p>
+}
+else
+{
+	<section class="course-details">
+		<h2>@Course.Title</h2>
+		<p class="course-description">@Course.Description</p>
+
+		<div class="lesson-list">
+			@foreach (var lesson in Lessons)
+			{
+				<LessonCard Lesson="lesson"
+				IsExpanded="@expandedLessons.Contains(lesson.LessonID)"
+				IsCompleted="@Progress.CompletedLessons.Contains(lesson.LessonID)"
+				OnToggle="ToggleLesson"
+				OnMarkCompleted="MarkLessonCompleted" />
+			}
+		</div>
+	</section>
+}
+
+@code {
+	[Parameter] public int courseId { get; set; }
+
+	private HashSet<int> expandedLessons = new();
+	private CourseDTO Course;
+	private List<LessonDTO> Lessons = new();
+
+	private CourseProgressDTO Progress = new()
+		{
+		// Dummy while loading
+			CompletedLessons = new List<int>()
+		};
+
+
+	bool isLoading = true;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		isLoading = true;
+
+		// Load the course
+		Course = await CourseService.GetCourseByIdAsync(courseId);
+
+		if (Course != null)
+		{
+			// Load the lessons for the course
+			Lessons = await LessonService.GetLessonsByCourseIdAsync(courseId);
+		}
+
+		// Try to load existing progress for this course
+		var existingProgress = await ProgressService.GetCourseProgressAsync(courseId);
+
+		if (existingProgress != null)
+		{
+			Progress = existingProgress;
+		}
+		else
+		{
+			// Create a new progress entry
+			Progress = await ProgressService.CreateProgressAsync(courseId);
+		}
+
+		isLoading = false;
+	}
+
+	private Task ToggleLesson(int lessonId)
+	{
+		if (!expandedLessons.Remove(lessonId))
+			expandedLessons.Add(lessonId);
+
+		return Task.CompletedTask;
+	}
+
+	private async Task MarkLessonCompleted(int lessonId)
+	{
+		// Invoke the patch
+		await ProgressService.MarkLessonCompleteAsync(Progress.ProgressID, lessonId);
+
+		// Update the local state so the UI shows "Completed"
+		Progress.CompletedLessons.Add(lessonId);
+	}
+
+}

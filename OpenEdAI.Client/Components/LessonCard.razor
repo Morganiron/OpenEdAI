@@ -1,0 +1,45 @@
+﻿@using OpenEdAI.Client.Models
+
+<div class="lesson-item" @key="Lesson.LessonID">
+	<div class="lesson-header" @onclick="() => OnToggle.InvokeAsync(Lesson.LessonID)" role="button" tabindex="0" aria-expanded="@IsExpanded">
+
+		<h5>@Lesson.Title</h5>
+
+		<div class="lesson-header-indicators">
+			@if (IsCompleted)
+			{
+				<span class="lesson-completed">
+					<i class="fa-solid fa-check lesson-completed-icon" aria-hidden="true"></i>
+					Completed
+				</span>
+			}
+			<i class="fa-solid @(IsExpanded ? "fa-chevron-down" : "fa-chevron-right") lesson-chevron" aria-hidden="true"></i>
+		</div>
+	</div>
+	@if (IsExpanded)
+	{
+		<p>@Lesson.Description</p>
+		<p><strong>Resources:</strong></p>
+		<ul class="ml-4 list-disc">
+			@foreach (var link in Lesson.ContentLinks)
+			{
+				<li>
+					<a href="@link" target="_blank" rel="noopener">@link</a>
+				</li>
+			}
+		</ul>
+		<button class="mark-complete-button" @onclick="() => OnMarkCompleted.InvokeAsync(Lesson.LessonID)">
+			Mark lesson as completed.
+		</button>
+	}
+
+</div>
+
+@code {
+	[Parameter] public LessonDTO Lesson { get; set; }
+	[Parameter] public bool IsExpanded { get; set; }
+	[Parameter] public bool IsCompleted { get; set; }
+
+	[Parameter] public EventCallback<int> OnToggle { get; set; }
+	[Parameter] public EventCallback<int> OnMarkCompleted { get; set; }
+}

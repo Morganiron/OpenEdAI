@@ -46,6 +46,7 @@ builder.Services.AddScoped<LogoutService>();
 builder.Services.AddScoped<CoursePersonalizationState>();
 builder.Services.AddScoped<StudentProfileState>();
 builder.Services.AddScoped<CourseProgressService>();
+builder.Services.AddScoped<LessonService>();
 builder.Services.AddSingleton<NotificationService>();
 
 // Bind the AuthConfig section from appsettings.json and register it as a singleton
