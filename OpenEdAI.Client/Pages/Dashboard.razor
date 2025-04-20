@@ -9,18 +9,11 @@
 
 <div class="dashboard-grid">
 	<div class="column-1">
-	</div>
-
-	<div class="column-2">
-	</div>
-
-	<div class="column-3">
 		<div class="course-cards-container">
 			<h2 class="course-cards-heading">Your Enrolled Courses</h2>
 			<input class="fa-search course-search-input"
 				   type="text"
 				   placeholder="Search your courses..."
-				   value="searchQuery"
 				   @oninput="(e) => searchQuery = e.Value!.ToString()!" />
 
 			@if (courses == null)
@@ -39,6 +32,10 @@
 				}
 			}
 		</div>
+	</div>
+
+	<div class="column-2">
+		<ProgressReport />
 	</div>
 
 </div>

@@ -1,0 +1,87 @@
+﻿@using OpenEdAI.Client.Services
+@using OpenEdAI.Client.Models
+@inject CourseProgressService ProgressService
+@inject CourseService CourseService
+
+<div class="progress-report-card">
+    <h3 class="progress-report-title">My Learning Progress Report</h3>
+
+    @if (progressData == null)
+    {
+        <p>Loading progress...</p>
+    }
+    else if (!progressData.Any())
+    {
+        <p>No progress available yet.</p>
+    }
+    else
+    {
+        <button class="button" @onclick="GenerateReport">Generate Report</button>
+
+        @if (reportRows != null)
+        {
+            <table class="progress-report-table">
+                <thead>
+                    <tr>
+                        <th>Course</th>
+                        <th>Lessons Completed</th>
+                        <th>Total Lessons</th>
+                        <th>Completion %</th>
+                        <th>Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in reportRows)
+                    {
+                        <tr>
+                            <td>@row.CourseTitle</td>
+                            <td>@row.LessonsCompleted</td>
+                            <td>@row.TotalLessons</td>
+                            <td>@($"{row.CompletionPercentage}%")</td>
+                            <td>@row.LastUpdated.ToLocalTime().ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@code {
+    private List<CourseProgressDTO> progressData;
+    private List<CourseDTO> courses;
+    private List<ProgressReportRow> reportRows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        progressData = await ProgressService.GetUserProgressAsync();
+        courses = await CourseService.GetEnrolledCoursesAsync();
+    }
+
+    private void GenerateReport()
+    {
+        reportRows = progressData.Select(progress =>
+        {
+            var course = courses.FirstOrDefault(c => c.CourseID == progress.CourseID);
+
+            return new ProgressReportRow
+                {
+                    CourseTitle = course?.Title ?? "Unknown",
+                    LessonsCompleted = progress.LessonsCompleted,
+                    TotalLessons = course?.LessonIds?.Count ?? 0,
+                    CompletionPercentage = progress.CompletionPercentage,
+                    LastUpdated = progress.LastUpdated
+                };
+        }).ToList();
+    }
+
+
+    private class ProgressReportRow
+    {
+        public string CourseTitle { get; set; }
+        public int LessonsCompleted { get; set; }
+        public int TotalLessons { get; set; }
+        public double CompletionPercentage { get; set; }
+        public DateTime LastUpdated { get; set; }
+    }
+}
