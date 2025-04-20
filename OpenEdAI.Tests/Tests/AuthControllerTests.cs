@@ -55,7 +55,9 @@ namespace OpenEdAI.Tests.Tests
             config.Setup(c => c["AWS:Cognito:RedirectUri"]).Returns("https://r");
             config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
 
-            var ctrl = new AuthController(config.Object, factory.Object);
+            var logger = new Mock<ILogger<AuthController>>();
+            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+
 
             // Act: call the ExchangeCode method with a dummy code
             var result = await ctrl.ExchangeCode(new AuthCodeExchangeRequest { Code = "foo" });
@@ -88,7 +90,8 @@ namespace OpenEdAI.Tests.Tests
             config.Setup(c => c["AWS:Cognito:RedirectUri"]).Returns("https://r");
             config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
 
-            var ctrl = new AuthController(config.Object, factory.Object);
+            var logger = new Mock<ILogger<AuthController>>();
+            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
 
             // Act: call the ExchangeCode method with a dummy code
             var actionResult = await ctrl.ExchangeCode(new AuthCodeExchangeRequest { Code = "foo" });
@@ -116,7 +119,9 @@ namespace OpenEdAI.Tests.Tests
             config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
 
             // Create the controller with the mocked configuration and HttpClient
-            var ctrl = new AuthController(config.Object, factory.Object);
+            var logger = new Mock<ILogger<AuthController>>();
+            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+
 
             // Act: call the RefreshToken method with a dummy refresh token
             var result = await ctrl.RefreshToken(new RefreshTokenRequest { RefreshToken = "x" });
@@ -151,7 +156,8 @@ namespace OpenEdAI.Tests.Tests
             config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
 
             // Create the controller with the mocked configuration and HttpClient
-            var ctrl = new AuthController(config.Object, factory.Object);
+            var logger = new Mock<ILogger<AuthController>>();
+            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
 
             // Act: call the RefreshToken method with a dummy refresh token
             var actionResult = await ctrl.RefreshToken(new RefreshTokenRequest { RefreshToken = "x" });
