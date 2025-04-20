@@ -7,6 +7,23 @@ body {
     color: #333;
     padding: 1rem;
 }
+
+/* ========== Button Styles ========== */
+.button {
+    padding: 0.6rem 1.2rem;
+    background-color: #2c3e50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+    .button:hover {
+        background-color: #1f2a38;
+    }
+
 /* ========== Validation ========== */
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
@@ -241,6 +258,103 @@ body {
             color: #333;
         }
 
+/* ========== Lesson Cards ========== */
+.lesson-item {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.lesson-header {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+    .lesson-title h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        text-align: center;
+    }
+
+.lesson-header-indicators {
+    position: absolute;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lesson-completed {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: bold;
+    color: #26b050;
+    margin-right: 1rem;
+    margin-left: 0;
+}
+
+.lesson-completed-icon {
+    font-size: 1rem;
+}
+
+.lesson-chevron {
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.lesson-item .button-container{
+    text-align: center;
+}
+
+.mark-complete-button {
+    margin-top: 1rem;
+    display: inline-block;
+}
+
+/* ========== Course Details Page ========== */
+.course-details {
+    max-width: 100%;
+    margin-left: 1rem;
+    margin-right: 1rem;
+    padding: 1.5rem;
+    background-color: #f1f1f1;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.course-details-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+    .course-details-header h2 {
+        width: 100%;
+        background-color: #2c3e50;
+        text-align: center;
+        font-size: 2rem;
+        color: white;
+        margin-top: 0;
+        padding: 0.5em;
+    }
+
+.course-description {
+    max-width: 75%;
+    align-content: center;
+    text-align: center;
+    margin: auto;
+}
+
 /* ========== Course Input Form ========== */
 .course-input-form {
     max-width: 800px;
@@ -265,19 +379,10 @@ body {
         border-radius: 4px;
     }
 
-    .course-input-form .btn-primary {
-        margin-top: 1rem;
-        padding: 0.5rem 1rem;
-        background-color: #2c3e50;
-        border: none;
-        color: white;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-        .course-input-form .btn-primary:hover {
-            background-color: #1f2a38;
-        }
+.reset-button {
+    float: right;
+    margin-left: 1rem;
+}
 
 
 /* ========== Course Generation & Planning ========== */
@@ -325,10 +430,6 @@ body {
         border-radius: 4px;
         border: 1px solid #ccc;
     }
-
-        .course-input-container .btn-generate:hover {
-            background-color: #1f2a38;
-        }
 
 /* ========== Lesson List Styling ========== */
 .lesson-list {
@@ -433,39 +534,6 @@ body {
             border-color: #2c3e50;
             outline: none;
         }
-
-/* ========== Button Styles ========== */
-.send-button {
-    padding: 0.6rem 1.2rem;
-    background-color: #2c3e50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
-
-    .send-button:hover {
-        background-color: #1f2a38;
-    }
-
-.reset-button {
-    padding: 0.6rem 1.2rem;
-    background-color: #2c3e50;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
-    float: right;
-    margin-left: 1rem;
-}
-
-    .reset-button:hover {
-        background-color: #1f2a38;
-    }
 
 /* Desktop */
 @media (min-width: 1024px) {

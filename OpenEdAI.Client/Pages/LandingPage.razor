@@ -8,11 +8,11 @@
 <p>Personalized, AI-powered learning from free online resources.</p>
 @if (isAuthenticated)
 {
-	<button @onclick="GoToDashboard">Go to Dashboard</button>
+	<button class="button" @onclick="GoToDashboard">Go to Dashboard</button>
 }
 else
 {
-	<button class="send-button" @onclick="Login">Login/Sign Up</button>
+	<button class="button" @onclick="Login">Login/Sign Up</button>
 }
 
 

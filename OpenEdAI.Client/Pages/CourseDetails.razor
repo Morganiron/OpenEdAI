@@ -15,7 +15,9 @@
 @inject LogoutService LogoutService
 @inject NotificationService Notification
 
-<h1>Course Details</h1>
+
+
+
 
 @if (isLoading)
 {
@@ -28,8 +30,20 @@ else if (Course == null)
 else
 {
 	<section class="course-details">
+		<div class="course-details-header">
 		<h2>@Course.Title</h2>
-		<p class="course-description">@Course.Description</p>
+
+		<div class="progress-container">
+            <div class="progress-circle">
+                <span>@Progress.CompletionPercentage%</span>
+            </div>
+            <small>Completed</small>
+        </div>
+	</div>
+		<span class="course-description">
+			<p><strong>@Course.Description</strong></p>
+		</span>
+		
 
 		<div class="lesson-list">
 			@foreach (var lesson in Lessons)
@@ -43,6 +57,7 @@ else
 		</div>
 	</section>
 }
+
 
 @code {
 	[Parameter] public int courseId { get; set; }

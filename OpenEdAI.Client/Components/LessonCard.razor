@@ -3,7 +3,9 @@
 <div class="lesson-item" @key="Lesson.LessonID">
 	<div class="lesson-header" @onclick="() => OnToggle.InvokeAsync(Lesson.LessonID)" role="button" tabindex="0" aria-expanded="@IsExpanded">
 
+		<div class="lesson-title">
 		<h5>@Lesson.Title</h5>
+		</div>
 
 		<div class="lesson-header-indicators">
 			@if (IsCompleted)
@@ -30,7 +32,11 @@
 		</ul>
 		<button class="mark-complete-button" @onclick="() => OnMarkCompleted.InvokeAsync(Lesson.LessonID)">
 			Mark lesson as completed.
+			<div class="button-container">
+				<button class="button mark-complete-button" @onclick="() => OnMarkCompleted.InvokeAsync(Lesson.LessonID)">
+					Mark lesson as completed
 		</button>
+			</div>
 	}
 
 </div>
