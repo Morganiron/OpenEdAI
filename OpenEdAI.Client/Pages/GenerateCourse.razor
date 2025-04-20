@@ -12,8 +12,9 @@
 @inject IJSRuntime JS
 @inject LogoutService LogoutService
 @inject NotificationService Notification
+@inject StudentService StudentService
 
-<!-- Prevent navigation if required fields are not completed -->
+<!-- Warn about data loss on any navigation -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
 <div class="generate-course-container">
@@ -26,8 +27,8 @@
 	{
 		<CoursePlanDisplay Plan="generatedPlan" />
 
-		<button class="btn btn-success send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
-		<button class="btn btn-clear reset-button" @onclick="ClearCoursePlan">Start Over</button>
+		<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
+		<button class="button reset-button" @onclick="ClearCoursePlan">Start Over</button>
 
 		<CoursePlanChat Messages="chatMessages" OnUserMessageSent="HandleUserChatMessage" />
 	}
@@ -43,6 +44,7 @@
 	private CoursePersonalizationInput lastInput;
 	private List<CoursePlanChat.ChatMessage> chatMessages = new();
 	private bool isLoggingOut = false;
+	private bool hasCompletedSetup = true;
 
 	// Constant strings for local storage keys to persist data
 	private const string PlanStorageKey = "cached_generated_plan";
@@ -54,6 +56,16 @@
 
 	protected override async Task OnInitializedAsync()
 	{
+		// Find out if this student has finished onboarding
+		try
+		{
+			(hasCompletedSetup, _) = await StudentService.GetStudentStatusAsync();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Generate-Course: Couldn't get student status - assuming completed. {ex}");
+		}
+
 		await LoadGeneratedPlanAsync();
 		await LoadChatMessagesAsync();
 
@@ -99,21 +111,31 @@
 		}
 	}
 
-	private Task ConfirmNavigationAsync(LocationChangingContext context)
+	private async Task ConfirmNavigationAsync(LocationChangingContext context)
 	{
 		if (LogoutService.IsLoggingOut)
 		{
-			// Allow navigation if it's a logout
-			return Task.CompletedTask;
+			// Always allow logout
+			return;
 		}
-
-		if (generatedPlan == null)
+		
+		// Completed setup and has generated a plan
+		if (generatedPlan != null && hasCompletedSetup)
 		{
-			// Prevent navigating away if a course plan is not generated (shows a confirmation dialog)
-			context.PreventNavigation();
+			return;
 		}
 
-		return Task.CompletedTask;
+		// New user - block navigation
+		if (!hasCompletedSetup && generatedPlan is null)
+		{
+			context.PreventNavigation();
+			await Notification.NotifyAndAwait("Please finish generating your first course before leaving this page.");
+			return;
+		}
+
+		// Everyone Else - show a notification to warn them of losing unsaved data
+		await Notification.NotifyAndAwait("Any information you've entered on this page may be lost when you leave.");
+
 	}
 
 	private async Task HandleUserChatMessage(string userMessage)
@@ -216,7 +238,7 @@
 		Loader.Show();
 		try
 		{
-			// If lastiput is null (e.g., page refresh), try to pull it from storage
+			// If lastinput is null (e.g., page refresh), try to pull it from storage
 			if (lastInput == null)
 			{
 				var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
