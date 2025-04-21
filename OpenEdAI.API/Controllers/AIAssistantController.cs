@@ -336,6 +336,7 @@ namespace OpenEdAI.API.Controllers
             if (!student.HasCompletedSetup)
             {
                 student.MarkSetupComplete();
+                await _context.SaveChangesAsync();
             }
 
             // Validate the course plan
