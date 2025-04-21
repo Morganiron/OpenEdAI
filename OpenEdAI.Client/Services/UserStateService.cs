@@ -192,36 +192,39 @@ namespace OpenEdAI.Client.Services
 
             if (string.IsNullOrEmpty(serialized))
             {
-                try
+                return default; // No data, safely return
+            }
+
+            try
+            {
+                var wrapper = JsonSerializer.Deserialize<UserSepecificWrapper<T>>(serialized);
+                if (wrapper != null)
                 {
-                    var wrapper = JsonSerializer.Deserialize<UserSepecificWrapper<T>>(serialized);
-                    if (wrapper != null)
+                    var ageMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - wrapper.Timestamp;
+                    if (ageMs < StorageExpriationHours * 60 * 60 * 1000)
                     {
-                        var ageMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - wrapper.Timestamp;
-                        if (ageMs < StorageExpriationHours * 60 * 60 * 1000)
+                        if (wrapper.Username == currentUsername)
                         {
-                            if(wrapper.Username == currentUsername)
-                            {
-                                return wrapper.Data;
-                            }
-                            else
-                            {
-                                // Different user, clear it
-                                await _js.InvokeVoidAsync("localStorage.removeItem", key);
-                            }
+                            return wrapper.Data;
                         }
                         else
                         {
-                            // Expired, clear it
+                            // Different user, clear it
                             await _js.InvokeVoidAsync("localStorage.removeItem", key);
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error loading {key} from localStorage");
+                    else
+                    {
+                        // Expired, clear it
+                        await _js.InvokeVoidAsync("localStorage.removeItem", key);
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error loading {key} from localStorage");
+            }
+
             return default;
         }
     }
