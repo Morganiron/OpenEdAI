@@ -139,8 +139,36 @@
 				Navigation.NavigateTo("/dashboard", replace: true);
 			}
 		}
-		catch (Exception ex)
+		catch (HttpRequestException ex)
 		{
+			// If the user is authenticated, but the student record doesn't exist (404), create one
+			if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+			{
+				try
+				{
+					// Call POST /api/students to create a new student record
+					var response = await Http.PostAsync("api/students", null);
+
+					if (response.IsSuccessStatusCode)
+					{
+						// Successfully created a new student record, try again
+						await DeterminePostAuthNavigation();
+						return;
+					}
+					else
+					{
+						Logger.LogError($"Failed to create student record. Status: {response.StatusCode}");
+						Navigation.NavigateTo("/", forceLoad: false);
+					}
+				}
+				catch (Exception createEx)
+				{
+					Logger.LogError($"Error creating a new student: {createEx.Message}");
+					Navigation.NavigateTo("/", replace: true);
+				}
+		}
+
+
 			Logger.LogError($"Error during post-authentication navigation: {ex.Message}");
 			Navigation.NavigateTo("/", forceLoad: false);
 		}
