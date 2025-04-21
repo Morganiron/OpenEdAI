@@ -58,6 +58,16 @@ namespace OpenEdAI.Client.Services
             LastInput = input;
         }
 
+        public void SetProfileDTO(StudentProfileDTO profile)
+        {
+            ProfileDTO = profile;
+        }
+
+        public void SetUsername(string username)
+        {
+            Username = username;
+        }
+
         // === CLEAR ALL ===
         public async void ClearCourseDataAsync()
         {

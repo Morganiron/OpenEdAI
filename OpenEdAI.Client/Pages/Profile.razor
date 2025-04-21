@@ -10,7 +10,7 @@
 @inject LoadingService Loader
 @inject StudentService StudentService
 @inject LogoutService LogoutService
-@inject UserStateService StudentProfileState
+@inject UserStateService UserStateService
 @inject IJSRuntime JS
 @inject TokenManager TokenManager
 @inject ILogger<Profile> Logger
@@ -55,7 +55,7 @@
             <!-- Education Level as a dropdown -->
             <div class="mb-3">
                 <label class="form-label">Education Level:</label>
-                <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select" @onchange="async (_) => await StudentProfileState.SaveProfileStateAsync(profileModel.Username)">
+                <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select" @onchange="async (_) => await UserStateService.SaveProfileStateAsync(profileModel.Username)">
                     <option value="">Select your education level</option>
                     @foreach (var level in availableEducationLevels)
                     {
@@ -71,9 +71,24 @@
                 {
                     <div class="form-check">
                         <InputCheckbox class="form-check-input"
-                        Value="@specialConsiderationSelections[type]"
-                        ValueChanged="@(value => OnPreferredContentTypesChanged(type, checkedValue))"
+                        Value="@contentTypeSelections[type]"
+                        ValueChanged="@(value => OnPreferredContentTypesChanged(type, value))"
                         ValueExpression="@(() => contentTypeSelections[type])" />
+                        <label class="form-check-label">@type</label>
+                    </div>
+                }
+            </div>
+
+            <!-- Special Considerations checkboxes -->
+            <div class="mb-3">
+                <label class="form-label">Special Considerations (optional):</label>
+                @foreach (var option in availableSpecialConsiderations)
+                {
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input"
+                        Value="@specialConsiderationSelections[option]"
+                        ValueChanged="@(value => OnSpecialConsiderationsChanged(option, value))"
+                        ValueExpression="@(() => specialConsiderationSelections[option])" />
                         <label class="form-check-label">@option</label>
                     </div>
                 }
@@ -104,14 +119,15 @@
                 }
                 else
                 {
-                    <InputTextArea @bind-Value="profileModel.AdditionalConsiderations" class="form-control"
-                    placeholder="@GetDefaultAdditionalPrompt()" @bind-Value:event="oninput" ValueChanged="async (_) => await StudentProfileState.SaveStateAsync(profileModel.Username)"/>
+                    <InputTextArea @bind-Value="profileModel.AdditionalConsiderations"
+                    class="form-control"
+                    placeholder="@GetDefaultAdditionalPrompt()"
+                    @oninput="HandleProfileChanged" />
                     <button type="button" class="button" @onclick="() => isEditingAdditionalConsiderations = false">Cancel</button>
                 }
             </div>
 
             <button type="submit" class="button">Save Profile Changes</button>
-
         </EditForm>
     }
 </div>
@@ -119,23 +135,19 @@
 @code {
     private bool isLoading = true;
     private bool isNewUser = false;
+    private bool isEditingAdditionalConsiderations = false;
     private string errorMessage = string.Empty;
     private ProfileModel profileModel = new ProfileModel();
     private EditContext editContext;
-
-    // Editing flags for each field
-    private bool isEditingAdditionalConsiderations = false;
 
     // Available options
     private List<string> availableEducationLevels = new() { "Elementary", "Middle School", "High School", "Associate's", "Bachelor's", "Master's", "PhD", "Other" };
     private List<string> availableContentTypes = new() { "Video tutorials", "Articles", "Discussion forums" };
     private List<string> availableSpecialConsiderations = new() { "ADHD", "Autism", "Dyslexia", "Other" };
 
-    // Checkboxes for Preferred content types
-    private Dictionary<string, bool> contentTypeSelections = new Dictionary<string, bool>();
-
-    // Checkboxes for Special Considerations
-    private Dictionary<string, bool> specialConsiderationSelections = new Dictionary<string, bool>();
+    // Checkboxes
+    private Dictionary<string, bool> contentTypeSelections = new();
+    private Dictionary<string, bool> specialConsiderationSelections = new();
 
     // Default prompt text for Additional Considerations field
     private readonly string educationOtherDefault = "Education(Other): Please enter your education";
@@ -146,42 +158,52 @@
         Loader.Show();
         try
         {
-            await StudentProfileState.LoadProfileStateAsync();
-
-            // Fetch the user, status, and "remote" profile from the API
+            // Fetch the "remote" profile from the API
+            await UserStateService.LoadProfileStateAsync();
             var student = await StudentService.GetCurrentStudentAsync();
+
+			// Check if the user is new
             isNewUser = !student.HasCompletedSetup;
-
-            // If the saved username doesn't match the current user, clear the cache
-            if (StudentProfileState.Username != student.Username)
+            
+			// Check if the user is the same as the one stored in the state
+            if (UserStateService.Username != student.Username)
             {
-                await StudentProfileState.ClearProfileStateAsync();
-                StudentProfileState.ProfileDTO = student.Profile ?? new StudentProfileDTO();
-                await StudentProfileState.SaveStateAsync(student.Username);
+                await UserStateService.ClearProfileStateAsync();
+                UserStateService.SetProfileDTO(student.Profile ?? new StudentProfileDTO());
+                UserStateService.SetUsername(student.Username);
+                await UserStateService.SaveProfileStateAsync(student.Username);
             }
-			else if (StudentProfileState.ProfileDTO == null)
-			{
-				// No profile loaded, fallback
-				StudentProfileState.ProfileDTO = student.Profile ?? new StudentProfileDTO();
-				await StudentProfileState.SaveStateAsync(student.Username);
-			}
-
-            // Set the DTO to the most up-to-date profile
-            var dto = StudentProfileState.ProfileDTO;
-
-            // Load profileModel
-            profileModel = new ProfileModel
+			// If the profile is not set, set it to the current student profile or create a blank one
+            else if (UserStateService.ProfileDTO == null)
             {
-                Username = student.Username,
-                EducationLevel = dto.EducationLevel,
-                PreferredContentTypes = dto.PreferredContentTypes,
-                SpecialConsiderations = dto.SpecialConsiderations,
-                AdditionalConsiderations = dto.AdditionalConsiderations
-            };
+                UserStateService.SetProfileDTO(student.Profile ?? new StudentProfileDTO());
+                await UserStateService.SaveProfileStateAsync(student.Username);
+            }
 
+			// Load the profile data into the model
+            var dto = UserStateService.ProfileDTO;
+
+            // Set the values for the profile
+            profileModel = new ProfileModel
+                {
+                    Username = student.Username,
+                    EducationLevel = dto.EducationLevel,
+                    PreferredContentTypes = dto.PreferredContentTypes,
+                    SpecialConsiderations = dto.SpecialConsiderations,
+                    AdditionalConsiderations = dto.AdditionalConsiderations
+                };
+
+			// If additional considerations are set as whitespace (" ") from the database, set it to empty string
+            if (profileModel.AdditionalConsiderations?.Trim() == "")
+            {
+                profileModel.AdditionalConsiderations = string.Empty;
+            }
+
+            
             editContext = new EditContext(profileModel);
 
-            // Initialize the checkboxes
+
+			// Initialize the checkboxes
             foreach (var type in availableContentTypes)
             {
                 contentTypeSelections[type] = profileModel.PreferredContentTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(type) ?? false;
@@ -191,16 +213,8 @@
             {
                 specialConsiderationSelections[option] = profileModel.SpecialConsiderations?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(option) ?? false;
             }
-            if (!string.IsNullOrEmpty(profileModel.SpecialConsiderations))
-            {
-                var selectedOptions = profileModel.SpecialConsiderations.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(x => x.Trim());
-                foreach (var option in availableSpecialConsiderations)
-                {
-                    specialConsiderationSelections[option] = selectedOptions.Contains(option);
-                }
-            }
-            await StudentProfileState.SaveStateAsync(profileModel.Username);
+
+            await UserStateService.SaveProfileStateAsync(profileModel.Username);
         }
         catch (Exception ex)
         {
@@ -213,108 +227,66 @@
         }
     }
 
-    private static bool AreProfilesEqual(StudentProfileDTO local, StudentProfileDTO remote)
+	// Method to handle changes in the profile
+    private async Task HandleProfileChanged(ChangeEventArgs args)
     {
-        return local.EducationLevel == remote.EducationLevel &&
-                        local.PreferredContentTypes == remote.PreferredContentTypes &&
-                        local.SpecialConsiderations == remote.SpecialConsiderations &&
-                        local.AdditionalConsiderations == remote.AdditionalConsiderations;
+        await UserStateService.SaveProfileStateAsync(profileModel.Username);
     }
 
+	// Method to handle changes in preferred content types
     private async Task OnPreferredContentTypesChanged(string type, bool newValue)
     {
-        // Update the dictionary for whichever checkbox changed.
         contentTypeSelections[type] = newValue;
-
-        // Rebuild the comma-separated string in the model.
-        profileModel.PreferredContentTypes = string.Join(", ",
-            contentTypeSelections
-                .Where(kv => kv.Value)
-                .Select(kv => kv.Key)
-        );
-
-        // Update validation
+        profileModel.PreferredContentTypes = string.Join(", ", contentTypeSelections.Where(x => x.Value).Select(x => x.Key));
         editContext.NotifyValidationStateChanged();
-
-        // Save the state to local storage
-        await StudentProfileState.SaveStateAsync(profileModel.Username);
+        await UserStateService.SaveProfileStateAsync(profileModel.Username);
         StateHasChanged();
     }
 
+	// Method to handle changes in special considerations
     private async Task OnSpecialConsiderationsChanged(string option, bool newValue)
     {
-        // Update the dictionary for whichever checkbox changed.
         specialConsiderationSelections[option] = newValue;
-
-        // Rebuild the SpecialConsiderations property from the dictionary.
-        profileModel.SpecialConsiderations = string.Join(", ",
-            specialConsiderationSelections
-                .Where(kv => kv.Value)
-                .Select(kv => kv.Key)
-        );
-
-        // Notify the EditContext of the change
+        profileModel.SpecialConsiderations = string.Join(", ", specialConsiderationSelections.Where(x => x.Value).Select(x => x.Key));
         editContext.NotifyValidationStateChanged();
-
-        // Save the state to local storage
-        await StudentProfileState.SaveStateAsync(profileModel.Username);
+        await UserStateService.SaveProfileStateAsync(profileModel.Username);
         StateHasChanged();
     }
 
+	// Method to handle form submission
     private async Task HandleValidSubmit()
     {
-        // Ensure username is set
         var student = await StudentService.GetCurrentStudentAsync();
         profileModel.Username = student.Username;
 
-        // Ensure that AdditionalConsiderations is not empty.
-        // If it is empty, assign it a single whitespace.
-        if (string.IsNullOrEmpty(profileModel.AdditionalConsiderations))
-        {
-            profileModel.AdditionalConsiderations = " ";
-        }
+        // Always save a single space if empty, to prevent DB null errors
+        profileModel.AdditionalConsiderations = string.IsNullOrWhiteSpace(profileModel.AdditionalConsiderations)
+            ? " "
+            : profileModel.AdditionalConsiderations.Trim();
+
 
         Loader.Show();
         try
         {
-            // Update Special Considerations
-            var selectedSpecial = specialConsiderationSelections
-                .Where(kv => kv.Value)
-                .Select(kv => kv.Key)
-                .ToList();
-
-            // If Special Consideration "Other" is selected, remove its literal value and simply record "Other"
-            if (specialConsiderationSelections.Any(x => x.Value && x.Key.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0))
-            {
-                selectedSpecial = selectedSpecial
-                    .Where(s => s.IndexOf("Other", StringComparison.OrdinalIgnoreCase) < 0)
-                    .ToList();
-                selectedSpecial.Add("Other");
-            }
-
-            profileModel.SpecialConsiderations = string.Join(", ", selectedSpecial);
-
             await StudentService.UpdateStudentProfileAsync(profileModel.ToUpdateDTO());
-            StudentProfileState.ProfileDTO = profileModel.ToUpdateDTO().Profile;
-            await StudentProfileState.SaveStateAsync(profileModel.Username);
+            UserStateService.SetProfileDTO(profileModel.ToUpdateDTO().Profile);
+            await UserStateService.SaveProfileStateAsync(profileModel.Username);
 
+			// Check if the user is new and navigate accordingly
             if (isNewUser)
             {
-				// Clear stored profile data
-				await StudentProfileState.ClearProfileStateAsync();
+                await UserStateService.ClearProfileStateAsync();
                 Navigation.NavigateTo("/generate-course", replace: true);
             }
             else
             {
-                // Clear stored profile data
-				await StudentProfileState.ClearProfileStateAsync();
-				Navigation.NavigateTo("/dashboard", replace: true);
+                await UserStateService.ClearProfileStateAsync();
+                Navigation.NavigateTo("/dashboard", replace: true);
             }
-
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex,"Error saving profile");
+            Logger.LogError(ex, "Error saving profile");
         }
         finally
         {
@@ -322,17 +294,16 @@
         }
     }
 
+    // Method to handle navigation lock
     private Task ConfirmNavigationAsync(LocationChangingContext context)
     {
         if (LogoutService.IsLoggingOut)
         {
-            // Allow navigation if it's a logout
             return Task.CompletedTask;
         }
 
         if (isNewUser && profileModel.IsProfileIncomplete())
         {
-            // Block navigation if profile is incomplete.
             context.PreventNavigation();
         }
         return Task.CompletedTask;
@@ -342,12 +313,11 @@
     private string GetDefaultAdditionalPrompt()
     {
         string prefix = "";
-        if (!string.IsNullOrEmpty(profileModel.EducationLevel) &&
-            profileModel.EducationLevel.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
+        if (!string.IsNullOrEmpty(profileModel.EducationLevel) && profileModel.EducationLevel.Contains("Other", StringComparison.OrdinalIgnoreCase))
         {
             prefix += $"{educationOtherDefault}\n";
         }
-        if (specialConsiderationSelections.Any(x => x.Value && x.Key.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0))
+        if (specialConsiderationSelections.Any(x => x.Value && x.Key.Contains("Other", StringComparison.OrdinalIgnoreCase)))
         {
             prefix += $"{specialOtherDefault}\n";
         }
@@ -379,39 +349,26 @@
             }
 
             // For "Other" selections, if EducationLevel contains "Other" but AdditionalConsiderations is empty:
-            if (!string.IsNullOrWhiteSpace(EducationLevel) &&
-                EducationLevel.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
-                {
-                    AdditionalConsiderations = "";
-                    yield return new ValidationResult(
-                        "Additional Information is required when Education is 'Other'.",
-                        new[] { nameof(AdditionalConsiderations) });
-                }
-            }
+            bool educationIsOther = !string.IsNullOrWhiteSpace(EducationLevel) &&
+                                     EducationLevel.Contains("Other", StringComparison.OrdinalIgnoreCase);
 
             // Similarly, if SpecialConsiderations contains "Other" but AdditionalConsiderations is empty:
-            if (!string.IsNullOrWhiteSpace(SpecialConsiderations) &&
-                SpecialConsiderations.IndexOf("Other", StringComparison.OrdinalIgnoreCase) >= 0)
+            bool specialConsiderationsIsOther = !string.IsNullOrWhiteSpace(SpecialConsiderations) &&
+                                     SpecialConsiderations.Contains("Other", StringComparison.OrdinalIgnoreCase);
+
+            if ((educationIsOther || specialConsiderationsIsOther) &&
+                string.IsNullOrWhiteSpace(AdditionalConsiderations))
             {
-                if (string.IsNullOrWhiteSpace(AdditionalConsiderations))
-                {
-                    AdditionalConsiderations = "";
-                    yield return new ValidationResult(
-                        "Additional Information is required when Special Consideration is 'Other'.",
-                        new[] { nameof(AdditionalConsiderations) });
-                }
+                yield return new ValidationResult(
+                    "Additional Information is required when 'Other' is selected.",
+                    new[] { nameof(AdditionalConsiderations) });
             }
         }
-
-        
 
         public UpdateStudentDTO ToUpdateDTO()
         {
             return new UpdateStudentDTO
                 {
-                
                     Username = this.Username,
                     Profile = new StudentProfileDTO
                     {
@@ -422,7 +379,5 @@
                     }
                 };
         }
-
-
     }
 }
