@@ -41,7 +41,7 @@
 
 	<!-- Right Column: Progress Report -->
 	<div class="column-2">
-		<ProgressReport />
+		<ProgressReport ProgressData="progressData" Courses="courses" />
 	</div>
 </div>
 
@@ -114,7 +114,7 @@
 				refreshTimer?.Dispose();
 				refreshTimer = null;
 
-				StateHasChanged();
+				await InvokeAsync(StateHasChanged);
 			}
 		},
 		null,

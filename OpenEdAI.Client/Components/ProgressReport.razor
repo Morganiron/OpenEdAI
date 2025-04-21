@@ -6,11 +6,11 @@
 <div class="progress-report-card">
     <h3 class="progress-report-title">My Learning Progress Report</h3>
 
-    @if (progressData == null)
+    @if (ProgressData == null)
     {
         <p>Loading progress...</p>
     }
-    else if (!progressData.Any())
+    else if (!ProgressData.Any())
     {
         <p>No progress available yet.</p>
     }
@@ -48,21 +48,20 @@
 </div>
 
 @code {
-    private List<CourseProgressDTO> progressData;
-    private List<CourseDTO> courses;
+    [Parameter]
+    public List<CourseProgressDTO> ProgressData { get; set; }
+    [Parameter]
+    public  List<CourseDTO> Courses { get; set; }
     private List<ProgressReportRow> reportRows;
-
-    protected override async Task OnInitializedAsync()
-    {
-        progressData = await ProgressService.GetUserProgressAsync();
-        courses = await CourseService.GetEnrolledCoursesAsync();
-    }
 
     private void GenerateReport()
     {
-        reportRows = progressData.Select(progress =>
+        if (ProgressData == null || Courses == null)
+            return;
+
+        reportRows = ProgressData.Select(progress =>
         {
-            var course = courses.FirstOrDefault(c => c.CourseID == progress.CourseID);
+            var course = Courses.FirstOrDefault(c => c.CourseID == progress.CourseID);
 
             return new ProgressReportRow
                 {
