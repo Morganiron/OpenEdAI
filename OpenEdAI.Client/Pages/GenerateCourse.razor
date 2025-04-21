@@ -266,6 +266,9 @@
 				// Set a flag in local storage to poll for new courses on the dashboard
 				await JS.InvokeVoidAsync("localStorage.setItem", "pollForNewCourse", "true");
 
+				// Update the hasCompletedSetup property
+				hasCompletedSetup = true;
+
 				// Redirect to dashboard
 				Navigation.NavigateTo("/dashboard");
 			}
