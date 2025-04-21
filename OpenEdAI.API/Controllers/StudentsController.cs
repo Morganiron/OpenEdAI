@@ -186,6 +186,21 @@ namespace OpenEdAI.API.Controllers
 
             // Create new student object and save to the database
             var student = new Student(userIdClaim, usernameClaim);
+
+            // Create an empty profile
+            var profile = new StudentProfile
+            {
+                UserId = userIdClaim,
+                EducationLevel = string.Empty,
+                PreferredContentTypes = string.Empty,
+                SpecialConsiderations = string.Empty,
+                AdditionalConsiderations = string.Empty
+            };
+
+            // Attach the profile to the student
+            student.SetProfile(profile);
+
+            // Save to the database
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
 
@@ -193,7 +208,18 @@ namespace OpenEdAI.API.Controllers
             var studentDto = new StudentDTO
             {
                 UserID = student.UserID,
-                Username = student.UserName
+                Username = student.UserName,
+                HasCompletedSetup = student.HasCompletedSetup,
+                Profile = new StudentProfileDTO
+                {
+                    EducationLevel = "",
+                    PreferredContentTypes = "",
+                    SpecialConsiderations = "",
+                    AdditionalConsiderations = ""
+                },
+                CreatorCourseIds = new List<int>(),
+                EnrolledCourseIds = new List<int>(),
+                ProgressRecordIds = new List<int>()
             };
 
             return CreatedAtAction(nameof(GetStudent), new { userid = student.UserID }, studentDto);
