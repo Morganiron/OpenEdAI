@@ -82,7 +82,7 @@
 			Loader.Show();
 			UserStateService.SetLastInput(input);
 
-			var response = await Http.PostAsync("ai/generate-coruse", JsonContent.Create(input));
+			var response = await Http.PostAsync("ai/generate-course", JsonContent.Create(input));
 
 			if (response.IsSuccessStatusCode)
 			{
