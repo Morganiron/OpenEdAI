@@ -13,19 +13,19 @@
 <!-- Navbar -->
 <nav class="navbar">
 	<div class="nav-left">
-		<a href="/"><i class="fa-solid fa-home" aria-hidden="true"></i></a>
-		<a href="/dashboard">Dashboard</a>
-		<a href="/profile">Profile</a>
-		<a href="generate-course">Create a Course</a>
+		<NavLink href="/"><i class="fa-solid fa-home" aria-hidden="true"></i></NavLink>
+		<NavLink href="/dashboard">Dashboard</NavLink>
+		<NavLink href="/profile">Profile</NavLink>
+		<NavLink href="generate-course">Create a Course</NavLink>
 	</div>
 	<div class="nav-right">
 		@if (isAuthenticated)
 		{
-			<a href="#" @onclick="Logout">Logout</a>
+			<NavLink href="#" @onclick="Logout">Logout</NavLink>
 		}
 		else if (onLandingPage)
 		{
-			<a href="#" @onclick="Login">Sign In / Sign Up</a>
+			<NavLink href="#" @onclick="Login">Sign In / Sign Up</NavLink>
 		}
 
 	</div>
