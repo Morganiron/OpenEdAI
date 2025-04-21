@@ -12,7 +12,7 @@ namespace OpenEdAI.Client.Services
 
         public StudentProfileDTO ProfileDTO { get; set; } = new();
 
-        public StudentProfileState(IJSRuntime js, ILogger logger)
+        public StudentProfileState(IJSRuntime js, ILogger<StudentProfileState> logger)
         {
             _js = js;
             _logger = logger;

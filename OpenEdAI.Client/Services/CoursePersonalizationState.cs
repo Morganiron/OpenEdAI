@@ -8,10 +8,10 @@ namespace OpenEdAI.Client.Services
     {
         private const string StorageKey = "course_personalization_input";
         private readonly IJSRuntime _js;
-        private readonly ILogger _logger;
+        private readonly ILogger<CoursePersonalizationState> _logger;
         public CoursePersonalizationInput Input { get; set; } = new();
 
-        public CoursePersonalizationState(IJSRuntime js, ILogger logger)
+        public CoursePersonalizationState(IJSRuntime js, ILogger<CoursePersonalizationState> logger)
         {
             _js = js;
             _logger = logger;
