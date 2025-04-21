@@ -101,12 +101,22 @@ namespace OpenEdAI.API.Services
                     ? "Video"
                     : "Article";
 
-                // Use the link vetting service to check if the URL is acceptable for the given type
-                if (!await LinkVet.IsAcceptableAsync(url, type, httpClient, token))
+                // Try to vet the URL, if it fails, skip it
+                try
                 {
-                    _logger.LogDebug("Link vetting failed for {Url}", url);
+                    // Use the link vetting service to check if the URL is acceptable for the given type
+                    if (!await LinkVet.IsAcceptableAsync(url, type, httpClient, token))
+                    {
+                        _logger.LogDebug("Link vetting failed for {Url}", url);
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Exception vetting link {Url}", url);
                     continue;
                 }
+                
 
 
                 // Keep at most 2 links of each type
