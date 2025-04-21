@@ -426,6 +426,12 @@ namespace OpenEdAI.API.Controllers
                     // Save the course and lessons to the database
                     scopedContext.Courses.Add(courseToSave);
                     await scopedContext.SaveChangesAsync(token);
+
+                    // Create the CourseProgress record immediately after saving the course so the course id is generated
+                    // then save the course progress to the database
+                    var courseProgress = new CourseProgress(userId, studentEntity.UserName, courseToSave.CourseID);
+                    scopedContext.CourseProgress.Add(courseProgress);
+                    await scopedContext.SaveChangesAsync(token);
                 }
                 catch (Exception ex)
                 {
