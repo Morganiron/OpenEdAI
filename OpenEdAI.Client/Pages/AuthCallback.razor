@@ -126,7 +126,7 @@
 				return;
 			}
 
-			if (!student.HasCompletedSetup && student.Profile == null)
+			if (!student.HasCompletedSetup && (student.Profile == null || string.IsNullOrWhiteSpace(student.Profile.EducationLevel)))
 			{
 				Navigation.NavigateTo("/profile", replace: true);
 			}
