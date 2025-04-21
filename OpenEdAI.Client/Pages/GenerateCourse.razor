@@ -14,6 +14,7 @@
 @inject NotificationService Notification
 @inject StudentService StudentService
 @inject ILogger<GenerateCourse> Logger
+@inject UserStateService UserStateService
 
 <!-- Warn about data loss on any navigation -->
 <NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
@@ -24,14 +25,19 @@
 		Welcome to the Course Generator! Based on your preferences, we'll use AI to create a personalized course outline!
 	</p>
 
-	@if (generatedPlan != null)
+	@if (!hasCompletedSetup)
 	{
-		<CoursePlanDisplay Plan="generatedPlan" />
+		<button class="button back-button" @onclick="GoToProfile">Back to profile</button>
+	}
+
+	@if (UserStateService.CoursePlan != null)
+	{
+		<CoursePlanDisplay Plan="UserStateService.CoursePlan" />
 
 		<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
 		<button class="button reset-button" @onclick="ClearCoursePlan">Start Over</button>
 
-		<CoursePlanChat Messages="chatMessages" OnUserMessageSent="HandleUserChatMessage" />
+		<CoursePlanChat Messages="UserStateService.ChatMessages" OnUserMessageSent="HandleUserChatMessage" />
 	}
 	else
 	{
@@ -41,60 +47,53 @@
 
 
 @code {
-	private CoursePlanDTO generatedPlan;
-	private CoursePersonalizationInput lastInput;
-	private List<CoursePlanChat.ChatMessage> chatMessages = new();
-	private bool isLoggingOut = false;
 	private bool hasCompletedSetup = true;
-
-	// Constant strings for local storage keys to persist data
-	private const string PlanStorageKey = "cached_generated_plan";
-	private const string ChatMessagesKey = "cached_chat_messages";
-	private const string InputStorageKey = "cached_course_input";
-
-	// Expiration time in hours (to remove stored items when returning to the page)
-	private const int StorageExpiration = 2;
+	private string currentUsername = string.Empty;
 
 	protected override async Task OnInitializedAsync()
 	{
-		// Find out if this student has finished onboarding
 		try
 		{
-			(hasCompletedSetup, _) = await StudentService.GetStudentStatusAsync();
+			var student = await StudentService.GetCurrentStudentAsync();
+			currentUsername = student?.Username ?? string.Empty;
+
+			var (completed, _) = await StudentService.GetStudentStatusAsync();
+			hasCompletedSetup = completed;
+
+			await UserStateService.LoadCoursePlanAsync(currentUsername);
+			await UserStateService.LoadChatMessagesAsync(currentUsername);
+			await UserStateService.LoadCourseInputAsync(currentUsername);
 		}
 		catch (Exception ex)
 		{
-			Logger.LogWarning($"Generate-Course: Couldn't get student status - assuming completed. {ex}");
+			Logger.LogWarning($"GenerateCourse: Couldn't load initial state. {ex}");
 		}
+	}
 
-		await LoadGeneratedPlanAsync();
-		await LoadChatMessagesAsync();
-
-		// Attempt to restore lastInput as well
-		var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
-		if (!string.IsNullOrEmpty(cachedInput))
-		{
-			lastInput = JsonSerializer.Deserialize<CoursePersonalizationInput>(cachedInput);
-		}
+	private void GoToProfile()
+	{
+		Navigation.NavigateTo("/profile");
 	}
 
 	private async Task HandleCourseInput(CoursePersonalizationInput input)
 	{
-		lastInput = input;
 		try
 		{
 			Loader.Show();
+			UserStateService.SetLastInput(input);
 
-			var response = await Http.PostAsync("ai/generate-course", JsonContent.Create(input));
+			var response = await Http.PostAsync("ai/generate-coruse", JsonContent.Create(input));
 
 			if (response.IsSuccessStatusCode)
 			{
-				generatedPlan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
-				chatMessages.Clear();
+				var plan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
+				UserStateService.SetCoursePlan(plan);
 
-				// Save the new course plan and the user input
-				await SaveGeneratedPlanAsync();
-				await JS.InvokeVoidAsync("localStorage.setItem", InputStorageKey, JsonSerializer.Serialize(lastInput));
+				UserStateService.SetChatMessages(new List<CoursePlanChat.ChatMessage>());
+
+				await UserStateService.SaveCoursePlanAsync(currentUsername);
+				await UserStateService.SaveCourseInputAsync(currentUsername);
+				await UserStateService.SaveChatMessagesAsync(currentUsername);
 			}
 			else
 			{
@@ -112,40 +111,13 @@
 		}
 	}
 
-	private async Task ConfirmNavigationAsync(LocationChangingContext context)
-	{
-		if (LogoutService.IsLoggingOut)
-		{
-			// Always allow logout
-			return;
-		}
-
-		// Completed setup and has generated a plan
-		if (generatedPlan != null && hasCompletedSetup)
-		{
-			return;
-		}
-
-		// New user - block navigation
-		if (!hasCompletedSetup && generatedPlan is null)
-		{
-			context.PreventNavigation();
-			await Notification.NotifyAndAwait("Please finish generating your first course before leaving this page.");
-			return;
-		}
-
-		// Everyone Else - show a notification to warn them of losing unsaved data
-		await Notification.NotifyAndAwait("Any information you've entered on this page may be lost when you leave.");
-
-	}
-
 	private async Task HandleUserChatMessage(string userMessage)
 	{
 		try
 		{
 			Loader.Show();
 
-			var serializedPlan = JsonSerializer.Serialize(generatedPlan);
+			var serializedPlan = JsonSerializer.Serialize(UserStateService.CoursePlan);
 
 			var requestPayload = new
 			{
@@ -166,21 +138,21 @@
 
 				if (adjustedPlan != null)
 				{
-					generatedPlan = adjustedPlan;
-					chatMessages.Add(new CoursePlanChat.ChatMessage
+					UserStateService.SetCoursePlan(adjustedPlan);
+					UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
 						{
 							Text = "Course plan updated based on your request.",
 							IsUser = false
 						});
 
 					// Save updated Plan and ChateMessages to local storage
-					await SaveGeneratedPlanAsync();
-					await SaveChatMessagesAsync();
+					await UserStateService.SaveCoursePlanAsync(currentUsername);
+					await UserStateService.SaveChatMessagesAsync(currentUsername);
 				}
 				else
 				{
 					Logger.LogError("Deserialization returned null.");
-					chatMessages.Add(new CoursePlanChat.ChatMessage
+					UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
 						{
 							Text = "The adjustment was processed but no valid plan was returned.",
 							IsUser = false
@@ -190,15 +162,15 @@
 			else
 			{
 				var error = await response.Content.ReadAsStringAsync();
-				Logger.LogError("Error from backend:\n", error);
+				Logger.LogError("Error adjusting course:\n", error);
 
-				chatMessages.Add(new CoursePlanChat.ChatMessage { Text = "Error processing your request. Please try again.", IsUser = false });
+				UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage { Text = "Error processing your request. Please try again.", IsUser = false });
 			}
 		}
 		catch (Exception ex)
 		{
 			Logger.LogError($"Exception in HandleUserChatMessage: {ex}");
-			chatMessages.Add(new CoursePlanChat.ChatMessage
+			UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
 				{
 					Text = "An unexpected error occurred while sending your request.",
 					IsUser = false
@@ -217,15 +189,9 @@
 
 		if (shouldClear)
 		{
-			await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
-			await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
-			await JS.InvokeVoidAsync("localStorage.removeItem", InputStorageKey);
-
-			// Reset the in-memory state
-			generatedPlan = null;
-			chatMessages.Clear();
-
-			// Trigger a re-render of the current component
+			await UserStateService.ClearCoursePlanAsync();
+			await UserStateService.ClearChatMessagesAsync();
+			await UserStateService.ClearCourseInputAsync();
 			StateHasChanged();
 		}
 	}
@@ -236,20 +202,15 @@
 		try
 		{
 			// If lastinput is null (e.g., page refresh), try to pull it from storage
-			if (lastInput == null)
+			if (UserStateService.LastInput == null)
 			{
-				var cachedInput = await JS.InvokeAsync<string>("localStorage.getItem", InputStorageKey);
-
-				if (!string.IsNullOrEmpty(cachedInput))
-				{
-					lastInput = JsonSerializer.Deserialize<CoursePersonalizationInput>(cachedInput);
-				}
+				await UserStateService.LoadCourseInputAsync(currentUsername);
 			}
 
 			var payload = new SubmitCourseRequest
 				{
-					Plan = generatedPlan,
-					UserInput = lastInput!
+					Plan = UserStateService.CoursePlan!,
+					UserInput = UserStateService.LastInput!
 				};
 
 			var response = await Http.PostAsJsonAsync("ai/submit-course", payload);
@@ -260,8 +221,9 @@
 				await Notification.NotifyAndAwait("Your course is being finalized.\nThe dashboard will refresh in a few minutes when the AI is done working its magic!");
 
 				// Clear the localstorage to no longer persist the input information
-				await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
-				await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+				await UserStateService.ClearCoursePlanAsync();
+				await UserStateService.ClearChatMessagesAsync();
+				await UserStateService.ClearCourseInputAsync();
 
 				// Set a flag in local storage to poll for new courses on the dashboard
 				await JS.InvokeVoidAsync("localStorage.setItem", "pollForNewCourse", "true");
@@ -287,107 +249,38 @@
 			Loader.Hide();
 		}
 	}
-	// Method to save the generated plan to local storage
-	private async Task SaveGeneratedPlanAsync()
+
+	private async Task ConfirmNavigationAsync(LocationChangingContext context)
 	{
-		if (generatedPlan != null)
+		if (LogoutService.IsLoggingOut)
 		{
-			var wrapper = new
-			{
-				Data = generatedPlan,
-				Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-			};
-
-			// Serialize the generated plan to a JSON string
-			var serialized = JsonSerializer.Serialize(wrapper);
-			await JS.InvokeVoidAsync("localStorage.setItem", PlanStorageKey, serialized);
+			// Always allow logout
+			return;
 		}
-	}
-	// Method to load the generated plan from local storage
-	private async Task LoadGeneratedPlanAsync()
-	{
-		var serialized = await JS.InvokeAsync<string>("localStorage.getItem", PlanStorageKey);
 
-		if (!string.IsNullOrEmpty(serialized))
+		// Completed setup and has generated a plan
+		if (UserStateService.CoursePlan != null && hasCompletedSetup)
 		{
-			try
-			{
-				var wrapper = JsonSerializer.Deserialize<JsonElement>(serialized);
-				if (wrapper.ValueKind == JsonValueKind.Object &&
-					wrapper.TryGetProperty("Timestamp", out var timestampProp) &&
-					wrapper.TryGetProperty("Data", out var dataProp))
-				{
-					var timestamp = timestampProp.GetInt64();
-					var age = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - timestamp;
-					if (age < StorageExpiration * 60 * 60 * 1000)
-					{
-						generatedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(dataProp.GetRawText(), new JsonSerializerOptions
-							{
-								PropertyNameCaseInsensitive = true
-							});
-						return;
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Logger.LogError($"Invalid plan format or exception: {ex.Message}");
-			}
-
-			// If any of the above fails, clear the old storage
-			await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
-
+			// Allow navigation
+			return;
 		}
-	}
-	// Method to save chat messages to local storage
-	private async Task SaveChatMessagesAsync()
-	{
-		if (chatMessages != null)
+
+		// New user - block navigation
+		if (!hasCompletedSetup && UserStateService.CoursePlan is null)
 		{
-			var wrapper = new
+			// Only allow navigation to the profile page
+			if (context.TargetLocation.Contains("/profile"))
 			{
-				Data = chatMessages,
-				Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-			};
-
-			// Serialize the generated plan to a JSON string
-			var serialized = JsonSerializer.Serialize(wrapper);
-			await JS.InvokeVoidAsync("localStorage.setItem", ChatMessagesKey, serialized);
-		}
-	}
-	// Method to load chat messages from local storage
-	private async Task LoadChatMessagesAsync()
-	{
-		var serialized = await JS.InvokeAsync<string>("localStorage.getItem", ChatMessagesKey);
-
-		if (!string.IsNullOrEmpty(serialized))
-		{
-			try
-			{
-				var wrapper = JsonSerializer.Deserialize<JsonElement>(serialized);
-				if (wrapper.ValueKind == JsonValueKind.Object &&
-					wrapper.TryGetProperty("Timestamp", out var timestampProp) &&
-					wrapper.TryGetProperty("Data", out var dataProp))
-				{
-					var timestamp = timestampProp.GetInt64();
-					var age = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - timestamp;
-					if (age < StorageExpiration * 60 * 60 * 1000)
-					{
-						chatMessages = JsonSerializer.Deserialize<List<CoursePlanChat.ChatMessage>>(dataProp.GetRawText(), new JsonSerializerOptions
-							{
-								PropertyNameCaseInsensitive = true
-							});
-						return;
-					}
-				}
+				return;
 			}
-			catch (Exception ex)
-			{
-				Logger.LogError($"Invalid chat format or exception: {ex.Message}");
-			}
-
-			// Clear legacy or corrupted data
-			await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+			// Block navigation to any other page
+			context.PreventNavigation();
+			await Notification.NotifyAndAwait("Please finish generating your first course before leaving this page.");
+			return;
 		}
+
+		// Everyone Else - show a notification to warn them of losing unsaved data
+		await Notification.NotifyAndAwait("Any information you've entered on this page may be lost when you leave.");
+
 	}
 }

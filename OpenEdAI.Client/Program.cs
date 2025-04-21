@@ -44,7 +44,7 @@ builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseGenerationService>();
 builder.Services.AddScoped<LogoutService>();
 builder.Services.AddScoped<CoursePersonalizationState>();
-builder.Services.AddScoped<StudentProfileState>();
+builder.Services.AddScoped<UserStateService>();
 builder.Services.AddScoped<CourseProgressService>();
 builder.Services.AddScoped<LessonService>();
 builder.Services.AddSingleton<NotificationService>();
