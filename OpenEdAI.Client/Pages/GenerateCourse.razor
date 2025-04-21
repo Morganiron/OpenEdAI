@@ -34,8 +34,18 @@
 	{
 		<CoursePlanDisplay Plan="UserStateService.CoursePlan" />
 
-		<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
-		<button class="button reset-button" @onclick="ClearCoursePlan">Start Over</button>
+		<div class="button-container">
+			<!-- Validation of proper course plan object to display submit button -->
+			@if (UserStateService.CoursePlan is not null
+							&& UserStateService.CoursePlan.Title != "Warning"
+							&& UserStateService.CoursePlan.Lessons?.Any() == true)
+			{
+				<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
+			}
+
+			<button class="button reset-button" @onclick="ClearCoursePlan">Start Over</button>
+		</div>
+
 
 		<CoursePlanChat Messages="UserStateService.ChatMessages" OnUserMessageSent="HandleUserChatMessage" />
 	}
@@ -84,13 +94,14 @@
 
 			var response = await Http.PostAsync("ai/generate-course", JsonContent.Create(input));
 
+			var json = await response.Content.ReadAsStringAsync();
+
+			// Parse and set the CoursePlan based on AI response (valid plan or warning)
+			ParseAndSetCoursePlan(json);
+
 			if (response.IsSuccessStatusCode)
 			{
-				var plan = await response.Content.ReadFromJsonAsync<CoursePlanDTO>();
-				UserStateService.SetCoursePlan(plan);
-
 				UserStateService.SetChatMessages(new List<CoursePlanChat.ChatMessage>());
-
 				await UserStateService.SaveCoursePlanAsync(currentUsername);
 				await UserStateService.SaveCourseInputAsync(currentUsername);
 				await UserStateService.SaveChatMessagesAsync(currentUsername);
@@ -116,7 +127,6 @@
 		try
 		{
 			Loader.Show();
-
 			var serializedPlan = JsonSerializer.Serialize(UserStateService.CoursePlan);
 
 			var requestPayload = new
@@ -127,37 +137,21 @@
 
 			var response = await Http.PostAsJsonAsync("ai/adjust-course", requestPayload);
 
+			var json = await response.Content.ReadAsStringAsync();
+			// Parse and set the CoursePlan based on AI adjustment response (valid plan or warning)
+			ParseAndSetCoursePlan(json);
+
 			if (response.IsSuccessStatusCode)
 			{
-				var json = await response.Content.ReadAsStringAsync();
-
-				var adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(json, new JsonSerializerOptions
+				UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
 					{
-						PropertyNameCaseInsensitive = true
+						Text = "Course plan updated based on your request.",
+						IsUser = false
 					});
 
-				if (adjustedPlan != null)
-				{
-					UserStateService.SetCoursePlan(adjustedPlan);
-					UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
-						{
-							Text = "Course plan updated based on your request.",
-							IsUser = false
-						});
-
-					// Save updated Plan and ChateMessages to local storage
-					await UserStateService.SaveCoursePlanAsync(currentUsername);
-					await UserStateService.SaveChatMessagesAsync(currentUsername);
-				}
-				else
-				{
-					Logger.LogError("Deserialization returned null.");
-					UserStateService.ChatMessages.Add(new CoursePlanChat.ChatMessage
-						{
-							Text = "The adjustment was processed but no valid plan was returned.",
-							IsUser = false
-						});
-				}
+				// Save updated Plan and ChatMessages to local storage
+				await UserStateService.SaveCoursePlanAsync(currentUsername);
+				await UserStateService.SaveChatMessagesAsync(currentUsername);
 			}
 			else
 			{
@@ -181,6 +175,38 @@
 			Loader.Hide();
 		}
 	}
+
+	// Helper method to parse course plan or warning message
+	private void ParseAndSetCoursePlan(string json)
+	{
+
+		if (json.Contains("\"Warning\""))
+		{
+			var warningObj = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+			UserStateService.SetCoursePlan(new CoursePlanDTO
+				{
+					Title = "Warning",
+					Description = warningObj?["Warning"] ?? "An unknown issue occurred.",
+					Tags = new List<string>(),
+					Lessons = new List<LessonPlanDTO>()
+				});
+			InvokeAsync(StateHasChanged);
+
+		}
+		else
+		{
+			var plan = JsonSerializer.Deserialize<CoursePlanDTO>(json, new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true
+				});
+
+			UserStateService.SetCoursePlan(plan);
+			InvokeAsync(StateHasChanged);
+		}
+	}
+
+
 	// Clear the stored CoursePlan and Chat and refresh the page
 	private async Task ClearCoursePlan()
 	{
@@ -189,16 +215,22 @@
 
 		if (shouldClear)
 		{
-			await UserStateService.ClearCoursePlanAsync();
-			await UserStateService.ClearChatMessagesAsync();
-			await UserStateService.ClearCourseInputAsync();
-			StateHasChanged();
+			// Ensure a full memory wipe.
+			await UserStateService.ClearCourseDataAsync();
+			await InvokeAsync(StateHasChanged);
 		}
 	}
 
 	private async Task SubmitCoursePlan()
 	{
 		Loader.Show();
+
+		// Double check the CoursePlan is valid
+		if (!UserStateService.CoursePlan.Lessons.Any())
+		{
+			return;
+		}
+
 		try
 		{
 			// If lastinput is null (e.g., page refresh), try to pull it from storage
@@ -255,6 +287,8 @@
 		if (LogoutService.IsLoggingOut)
 		{
 			// Always allow logout
+			// Clear data
+			await UserStateService.ClearCourseDataAsync();
 			return;
 		}
 

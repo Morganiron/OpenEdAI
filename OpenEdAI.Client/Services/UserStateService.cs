@@ -69,11 +69,12 @@ namespace OpenEdAI.Client.Services
         }
 
         // === CLEAR ALL ===
-        public async void ClearCourseDataAsync()
+        public Task ClearCourseDataAsync()
         {
-            await ClearCoursePlanAsync();
-            await ClearChatMessagesAsync();
-            await ClearCourseInputAsync();
+            return Task.WhenAll(
+            ClearCoursePlanAsync(),
+            ClearChatMessagesAsync(),
+            ClearCourseInputAsync());
         }
 
         // === PROFILE METHODS ===
