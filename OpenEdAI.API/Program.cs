@@ -250,6 +250,10 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Inject logger factory into LinkVet
+var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+LinkVet.Initialize(loggerFactory);
+
 // Configure the HTTP request pipeline.
 // Enable Swagger for all environments
 app.UseSwagger();
