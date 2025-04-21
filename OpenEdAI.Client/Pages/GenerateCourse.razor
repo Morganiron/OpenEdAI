@@ -119,7 +119,7 @@
 			// Always allow logout
 			return;
 		}
-		
+
 		// Completed setup and has generated a plan
 		if (generatedPlan != null && hasCompletedSetup)
 		{
@@ -158,7 +158,7 @@
 			if (response.IsSuccessStatusCode)
 			{
 				var json = await response.Content.ReadAsStringAsync();
-				
+
 				var adjustedPlan = JsonSerializer.Deserialize<CoursePlanDTO>(json, new JsonSerializerOptions
 					{
 						PropertyNameCaseInsensitive = true
@@ -262,6 +262,9 @@
 				// Clear the localstorage to no longer persist the input information
 				await JS.InvokeVoidAsync("localStorage.removeItem", PlanStorageKey);
 				await JS.InvokeVoidAsync("localStorage.removeItem", ChatMessagesKey);
+
+				// Set a flag in local storage to poll for new courses on the dashboard
+				await JS.InvokeVoidAsync("localStorage.setItem", "pollForNewCourse", "true");
 
 				// Redirect to dashboard
 				Navigation.NavigateTo("/dashboard");

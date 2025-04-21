@@ -4,18 +4,23 @@
 @using OpenEdAI.Client.Models
 @using OpenEdAI.Client.Components
 @using OpenEdAI.Client.Services
+@inject IJSRuntime JS
 @inject Services.CourseService CourseService
 @inject Services.CourseProgressService ProgressService
 
+<!-- Main Dashboard Layout -->
 <div class="dashboard-grid">
+	<!-- Left Column: Course Cards -->
 	<div class="column-1">
 		<div class="course-cards-container">
 			<h2 class="course-cards-heading">Your Enrolled Courses</h2>
+			<!-- Search bar -->
 			<input class="fa-search course-search-input"
 				   type="text"
 				   placeholder="Search your courses..."
 				   @oninput="(e) => searchQuery = e.Value!.ToString()!" />
 
+			<!-- Show loading, no courses, or course list -->
 			@if (courses == null)
 			{
 				<p>Loading courses...</p>
@@ -34,17 +39,21 @@
 		</div>
 	</div>
 
+	<!-- Right Column: Progress Report -->
 	<div class="column-2">
 		<ProgressReport />
 	</div>
-
 </div>
 
 @code {
+	
 	private List<CourseDTO> courses;
 	private List<CourseProgressDTO> progressData;
 	private string searchQuery = "";
+	private Timer refreshTimer;
+	private int previousCourseCount = 0;
 
+	// Computed property: filters courses based on search input
 	private IEnumerable<CourseDTO> FilteredCourses
 	{
 		get
@@ -65,12 +74,62 @@
 		}
 	}
 
+	// Lifecycle: Load initial courses and progress data
 	protected override async Task OnInitializedAsync()
 	{
 		courses = await CourseService.GetEnrolledCoursesAsync();
 		progressData = await ProgressService.GetUserProgressAsync();
+
+		// Check if polling needs to start after course creation
+		var pollFlag = await JS.InvokeAsync<string>("localStorage.getItem", "pollForNewCourse");
+
+		if (pollFlag == "true")
+		{
+			StartPollingForNewCourse();
+		}
 	}
 
+	// Starts polling to detect newly created courses
+	private void StartPollingForNewCourse()
+	{
+		previousCourseCount = courses?.Count ?? 0;
+
+		refreshTimer = new Timer(async _ =>
+		{
+			var latestCourses = await CourseService.GetEnrolledCoursesAsync();
+
+			if (latestCourses.Count > previousCourseCount)
+			{
+				// Update course list and UI when a new course is detected
+				courses = latestCourses;
+				previousCourseCount = courses.Count;
+
+				// Update the progress data for the progress report
+				progressData = await ProgressService.GetUserProgressAsync();
+
+				// Clear the poll flag from local storage
+				await JS.InvokeVoidAsync("localStorage.removeItem", "pollForNewCourse");
+
+				// Stop polling
+				refreshTimer?.Dispose();
+				refreshTimer = null;
+
+				StateHasChanged();
+			}
+		},
+		null,
+		TimeSpan.Zero,
+		TimeSpan.FromSeconds(20)); // Poll every 20 seconds
+	}
+
+	// Cleanup: Dispose the timer when the component is destroyed
+	public async ValueTask DisposeAsync()
+	{
+		refreshTimer?.Dispose();
+		await Task.CompletedTask;
+	}
+
+	// Retrieve user's progress for a specific course
 	private CourseProgressDTO GetProgressForCourse(int courseId)
 	{
 		return progressData.FirstOrDefault(p => p.CourseID == courseId)
