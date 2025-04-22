@@ -73,5 +73,24 @@ namespace OpenEdAI.Client.Services
                 _loader.Hide();
             }
         }
+
+        public async Task<bool> UnenrollFromCourseAsync(int courseId)
+        {
+            // Get the student from the authentication state
+            var authState = await _authStateProvider.GetAuthenticationStateAsync();
+            var student = authState.User;
+            var studentId = student.FindFirst("sub")?.Value;
+
+            try
+            {
+                var response = await _http.DeleteAsync($"api/courses/{courseId}/UnenrollStudent/{studentId}");
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error unenrolling from course {courseId}: {ex.Message}");
+                return false;
+            }
+        }
     }
 }

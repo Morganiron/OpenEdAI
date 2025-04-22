@@ -3,6 +3,7 @@
 <div class="course-card" @onclick="NavigateToCourse" style="cursor:pointer;">
     <div class="course-card-header">
         <h2>@Course.Title</h2>
+            <div class="delete-button" @onclick:stopPropagation @onclick="OnDelete"><i class="fas fa-trash"></i></div>
 
         <div class="progress-container">
             @if (Progress.CompletionPercentage < 100)
@@ -42,6 +43,7 @@
 @code {
 	[Parameter] public CourseDTO Course { get; set; }
 	[Parameter] public CourseProgressDTO Progress { get; set; }
+	[Parameter] public EventCallback OnDelete { get; set; }
 
 	[Inject] private NavigationManager Navigation { get; set; }
 

@@ -7,6 +7,7 @@
 @inject IJSRuntime JS
 @inject Services.CourseService CourseService
 @inject Services.CourseProgressService ProgressService
+@inject NotificationService Notification
 
 <!-- Main Dashboard Layout -->
 <div class="dashboard-grid">
@@ -33,7 +34,7 @@
 			{
 				@foreach (var course in FilteredCourses)
 				{
-					<CourseCard Course="course" Progress="@GetProgressForCourse(course.CourseID)" />
+					<CourseCard Course="course" Progress="@GetProgressForCourse(course.CourseID)" OnDelete="@(() => HandleUnenroll(course.CourseID))"/>
 				}
 			}
 		</div>
@@ -86,6 +87,28 @@
 		if (pollFlag == "true")
 		{
 			StartPollingForNewCourse();
+		}
+	}
+
+	// Handle unenrollment from a course
+	private async Task HandleUnenroll(int courseId)
+	{
+		var confirm = await Notification.ConfirmAsync("Are you sure you want to unenroll from this course?\nIt will no longer be available.");
+
+		if (!confirm) return;
+
+		// Attempt to unenroll the student from the course
+		var success = await CourseService.UnenrollFromCourseAsync(courseId);
+
+		if (success)
+		{
+			courses = await CourseService.GetEnrolledCoursesAsync();
+			progressData = await ProgressService.GetUserProgressAsync();
+			await InvokeAsync(StateHasChanged);
+		}
+		else
+		{
+			await Notification.NotifyAndAwait("Failed to unenroll from the course. Please try again later.");
 		}
 	}
 
