@@ -41,7 +41,20 @@
 	<div class="notification-overlay">
 		<div class="notification-popup">
 			<p>@message</p>
-			<button class="btn send-button" @onclick="OnOKClicked">OK</button>
+
+			<!-- Conditional for different types of notifications-->
+			@if (isConfirmMode)
+			{
+				<div class="button-group">
+					<button class="button" @onclick="() => Respond(true)">OK</button>
+					<button class="button" @onclick="() => Respond(false)">Cancel</button>
+				</div>
+			}
+			else
+			{
+				<button class="btn send-button" @onclick="OnOKClicked">OK</button>
+			}
+
 		</div>
 	</div>
 }
@@ -51,7 +64,9 @@
 	private bool isAuthenticated = false;
 	private bool onLandingPage = false;
 	private string? message;
+	private bool isConfirmMode = false;
 	private bool isLoggingOut = false;
+	private TaskCompletionSource<bool>? promptTcs;
 	private AuthenticationStateChangedHandler? authHandler;
 
 
@@ -67,11 +82,16 @@
 
 		AuthStateProvider.AuthenticationStateChanged += authHandler;
 
+		// Subscribe to notifications
+		Notification.OnNotify += ShowNotification;
+		Notification.OnPrompt += ShowConfirmation;
+
 	}
 
 	public void Dispose()
 	{
 		Notification.OnNotify -= ShowNotification;
+		Notification.OnPrompt -= ShowConfirmation;
 
 		if (authHandler is not null)
 			AuthStateProvider.AuthenticationStateChanged -= authHandler;
@@ -86,7 +106,17 @@
 	{
 		// Handle the notification message
 		message = msg;
+		isConfirmMode = false;
 		StateHasChanged();
+	}
+
+	private async Task<bool> ShowConfirmation(string msg)
+	{
+		message = msg;
+		isConfirmMode = true;
+		promptTcs = new TaskCompletionSource<bool>();
+		StateHasChanged();
+		return await promptTcs.Task;
 	}
 
 	private void OnOKClicked()
@@ -97,6 +127,13 @@
 
 		// Signal the back to Notify and await
 		Notification.Acknowledge();
+	}
+
+	private void Respond(bool confirmed)
+	{
+		message = null;
+		StateHasChanged();
+		promptTcs?.SetResult(confirmed);
 	}
 
 	private async Task SetAuthAndRouteState()
