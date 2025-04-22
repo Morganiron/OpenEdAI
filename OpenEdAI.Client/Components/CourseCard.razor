@@ -5,20 +5,37 @@
         <h2>@Course.Title</h2>
 
         <div class="progress-container">
-            <div class="progress-circle">
-                <span>@Progress.CompletionPercentage%</span>
-            </div>
-            <small>Completed</small>
+            @if (Progress.CompletionPercentage < 100)
+            {
+                <div class="progress-circle">
+                    <span>@Progress.CompletionPercentage%</span>
+                </div>
+            }
+            else
+            {
+               <div style="border: 4px solid greenyellow" class="progress-circle">
+                    <span>@Progress.CompletionPercentage%</span>
+                </div>
+            }
+                    
+            <small>Course Progress</small>
         </div>
+        @if (Progress.CompletionPercentage == 100)
+        {
+            <div class="course-completed-badge">
+                <p class="course-completed-label"><strong>Congratulations! You have completed this course!</strong></p>
+            </div>
+        }
     </div>
 
     <div class="course-card-body">
         <p class="description">@Course.Description</p>
-
+        <!-- Hide the metadata for now
         <p><strong>Tags:</strong> @string.Join(", ", Course.Tags ?? new())</p>
         <p><small>Created by: <em>@Course.UserName</em></small></p>
         <p><small>Created: @Course.CreatedDate.ToShortDateString()</small></p>
         <p><small>Updated: @Course.UpdateDate.ToShortDateString()</small></p>
+        -->
     </div>
 </div>
 
