@@ -367,7 +367,7 @@ body {
 /* Course Completion Badge Styling */
 .course-completed-badge {
     margin-top: 0.5rem;
-    background-color: #4b9c5b;
+    background-color: #2c3e50;
     padding: 0.25rem 1rem;
     border-radius: 1rem;
     display: inline-block;
@@ -375,7 +375,7 @@ body {
 }
 
 .course-completed-label {
-    color: #f5ff00;
+    color: #fff;
     font-size: 1.2rem;
 }
 
