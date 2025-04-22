@@ -37,8 +37,8 @@
 		<div class="button-container">
 			<!-- Validation of proper course plan object to display submit button -->
 			@if (UserStateService.CoursePlan is not null
-							&& UserStateService.CoursePlan.Title != "Warning"
-							&& UserStateService.CoursePlan.Lessons?.Any() == true)
+													&& UserStateService.CoursePlan.Title != "Warning"
+													&& UserStateService.CoursePlan.Lessons?.Any() == true)
 			{
 				<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
 			}
@@ -211,7 +211,7 @@
 	private async Task ClearCoursePlan()
 	{
 		// Show a confirmation popup to the user
-		bool shouldClear = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to start over?\nThis will clear your chat and generated course plan.");
+		bool shouldClear = await Notification.ConfirmAsync("Are you sure you want to start over?\nThis will clear your chat and generated course plan.");
 
 		if (shouldClear)
 		{
@@ -314,7 +314,11 @@
 		}
 
 		// Everyone Else - show a notification to warn them of losing unsaved data
-		await Notification.NotifyAndAwait("Any information you've entered on this page may be lost when you leave.");
-
+		var confirm = await Notification.ConfirmAsync("Any information you've entered on this page may be lost when you leave.");
+		if (!confirm)
+		{
+			context.PreventNavigation();
+		}
+		// No need for an else, they will be able to navigate away.
 	}
 }
