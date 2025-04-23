@@ -122,8 +122,7 @@
                 {
                     <InputTextArea @bind-Value="profileModel.AdditionalConsiderations"
                     class="form-control"
-                    placeholder="@GetDefaultAdditionalPrompt()"
-                    @oninput="HandleProfileChanged" />
+                    placeholder="@GetDefaultAdditionalPrompt()" />
                     <button type="button" class="button" @onclick="() => isEditingAdditionalConsiderations = false">Cancel</button>
                 }
             </div>
@@ -159,9 +158,9 @@
         Loader.Show();
         try
         {
-            // Fetch the "remote" profile from the API
-            await UserStateService.LoadProfileStateAsync();
+            // Fetch the proper profile data for this user
             var student = await StudentService.GetCurrentStudentAsync();
+            await UserStateService.LoadProfileStateAsync(student.Username);
 
             // Check if the user is new
             isNewUser = !student.HasCompletedSetup;
@@ -228,12 +227,6 @@
         }
     }
 
-    // Method to handle changes in the profile
-    private async Task HandleProfileChanged(ChangeEventArgs args)
-    {
-        await UserStateService.SaveProfileStateAsync(profileModel.Username);
-    }
-
     // Method to handle changes in preferred content types
     private async Task OnPreferredContentTypesChanged(string type, bool newValue)
     {
@@ -269,9 +262,8 @@
         Loader.Show();
         try
         {
+            // Save the profile data to the database
             await StudentService.UpdateStudentProfileAsync(profileModel.ToUpdateDTO());
-            UserStateService.SetProfileDTO(profileModel.ToUpdateDTO().Profile);
-            await UserStateService.SaveProfileStateAsync(profileModel.Username);
 
             // Check if the user is new and navigate accordingly
             if (isNewUser)

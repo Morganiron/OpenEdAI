@@ -78,38 +78,26 @@ namespace OpenEdAI.Client.Services
         }
 
         // === PROFILE METHODS ===
-        public async Task LoadProfileStateAsync()
+        public async Task LoadProfileStateAsync(string currentUsername)
         {
-            var json = await _js.InvokeAsync<string>("localStorage.getItem", ProfileStorageKey);
-            if (!string.IsNullOrEmpty(json))
+            var profile = await LoadFromStorageAsync<StudentProfileDTO>(ProfileStorageKey, currentUsername);
+            if (profile != null)
             {
-                try
-                {
-                    var saved = JsonSerializer.Deserialize<SavedProfile>(json);
-                    if (saved != null)
-                    {
-                        Username = saved.Username;
-                        ProfileDTO = saved.Profile ?? new();
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogError(ex, "Error deserializing StudentProfileDTO:");
-                    ProfileDTO = new StudentProfileDTO();
-                    Username = null;
-                }
+                ProfileDTO = profile;
+                Username = currentUsername;
+            }
+            else
+            {
+                // No cached data for this user
+                ProfileDTO = new StudentProfileDTO();
+                Username = null;
             }
         }
 
-        public async Task SaveProfileStateAsync(string username)
+        // Persist the in-memory ProfileDTO to local storage
+        public Task SaveProfileStateAsync(string username)
         {
-            var saved = new SavedProfile
-            {
-                Username = username,
-                Profile = ProfileDTO
-            };
-            var json = JsonSerializer.Serialize(saved);
-            await _js.InvokeVoidAsync("localStorage.setItem", ProfileStorageKey, json);
+            return SaveToStorageAsync(ProfileStorageKey, ProfileDTO, username);
         }
 
         public async Task ClearProfileStateAsync()
