@@ -49,13 +49,13 @@
             <!-- Username read-only from Cognito -->
             <div class="mb-3">
                 <label class="form-label">
-                    Username: <span class="username-display">@profileModel.Username</span>
+                    <strong>Username:</strong> <span class="username-display">@profileModel.Username</span>
                 </label>
             </div>
 
             <!-- Education Level as a dropdown -->
             <div class="mb-3">
-                <label class="form-label">Education Level:</label>
+                <label class="form-label"><strong>Education Level:</strong></label>
                 <InputSelect @bind-Value="profileModel.EducationLevel" class="form-select" @onchange="async (_) => await UserStateService.SaveProfileStateAsync(profileModel.Username)">
                     <option value="">Select your education level</option>
                     @foreach (var level in availableEducationLevels)
@@ -67,7 +67,7 @@
 
             <!-- Preferred Content Type checkboxes -->
             <div class="mb-3">
-                <label class="form-label">Preferred Content Types:</label>
+                <label class="form-label"><strong>Preferred Content Types:</strong></label>
                 @foreach (var type in availableContentTypes)
                 {
                     <div class="form-check">
@@ -82,7 +82,7 @@
 
             <!-- Special Considerations checkboxes -->
             <div class="mb-3">
-                <label class="form-label">Special Considerations (optional):</label>
+                <label class="form-label"><strong>Special Considerations (optional):</strong></label>
                 @foreach (var option in availableSpecialConsiderations)
                 {
                     <div class="form-check">
@@ -101,20 +101,20 @@
 
             <!-- Additional Considerations Information -->
             <div class="mb-3">
-                <label class="form-label">Additional Information:</label>
+                <label class="form-label"><strong>Additional Information:</strong></label>
                 @if (!isEditingAdditionalConsiderations)
                 {
                     <div>
                         @if (string.IsNullOrWhiteSpace(profileModel.AdditionalConsiderations))
                         {
-                            <em>No Additional information provided.</em>
+                            <em>No Additional information provided. </em>
                         }
                         else
                         {
                             @profileModel.AdditionalConsiderations
                         }
-                        <button type="button" class="btn btn-link" @onclick="() => isEditingAdditionalConsiderations = true">
-                            <i class="bi bi-pencil"></i>
+                        <button type="button" class="btn-link" @onclick="() => isEditingAdditionalConsiderations = true">
+                            <i class="fas fa-pencil"></i>
                         </button>
                     </div>
                 }
