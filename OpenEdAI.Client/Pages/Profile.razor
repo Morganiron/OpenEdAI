@@ -6,6 +6,7 @@
 @using OpenEdAI.Client.Models
 @using OpenEdAI.Client.Services
 @inject NavigationManager Navigation
+@inject NotificationService Notification
 @inject HttpClient Http
 @inject LoadingService Loader
 @inject StudentService StudentService
@@ -162,10 +163,10 @@
             await UserStateService.LoadProfileStateAsync();
             var student = await StudentService.GetCurrentStudentAsync();
 
-			// Check if the user is new
+            // Check if the user is new
             isNewUser = !student.HasCompletedSetup;
-            
-			// Check if the user is the same as the one stored in the state
+
+            // Check if the user is the same as the one stored in the state
             if (UserStateService.Username != student.Username)
             {
                 await UserStateService.ClearProfileStateAsync();
@@ -173,14 +174,14 @@
                 UserStateService.SetUsername(student.Username);
                 await UserStateService.SaveProfileStateAsync(student.Username);
             }
-			// If the profile is not set, set it to the current student profile or create a blank one
+            // If the profile is not set, set it to the current student profile or create a blank one
             else if (UserStateService.ProfileDTO == null)
             {
                 UserStateService.SetProfileDTO(student.Profile ?? new StudentProfileDTO());
                 await UserStateService.SaveProfileStateAsync(student.Username);
             }
 
-			// Load the profile data into the model
+            // Load the profile data into the model
             var dto = UserStateService.ProfileDTO;
 
             // Set the values for the profile
@@ -193,17 +194,17 @@
                     AdditionalConsiderations = dto.AdditionalConsiderations
                 };
 
-			// If additional considerations are set as whitespace (" ") from the database, set it to empty string
+            // If additional considerations are set as whitespace (" ") from the database, set it to empty string
             if (profileModel.AdditionalConsiderations?.Trim() == "")
             {
                 profileModel.AdditionalConsiderations = string.Empty;
             }
 
-            
+
             editContext = new EditContext(profileModel);
 
 
-			// Initialize the checkboxes
+            // Initialize the checkboxes
             foreach (var type in availableContentTypes)
             {
                 contentTypeSelections[type] = profileModel.PreferredContentTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Contains(type) ?? false;
@@ -227,13 +228,13 @@
         }
     }
 
-	// Method to handle changes in the profile
+    // Method to handle changes in the profile
     private async Task HandleProfileChanged(ChangeEventArgs args)
     {
         await UserStateService.SaveProfileStateAsync(profileModel.Username);
     }
 
-	// Method to handle changes in preferred content types
+    // Method to handle changes in preferred content types
     private async Task OnPreferredContentTypesChanged(string type, bool newValue)
     {
         contentTypeSelections[type] = newValue;
@@ -243,7 +244,7 @@
         StateHasChanged();
     }
 
-	// Method to handle changes in special considerations
+    // Method to handle changes in special considerations
     private async Task OnSpecialConsiderationsChanged(string option, bool newValue)
     {
         specialConsiderationSelections[option] = newValue;
@@ -253,7 +254,7 @@
         StateHasChanged();
     }
 
-	// Method to handle form submission
+    // Method to handle form submission
     private async Task HandleValidSubmit()
     {
         var student = await StudentService.GetCurrentStudentAsync();
@@ -272,7 +273,7 @@
             UserStateService.SetProfileDTO(profileModel.ToUpdateDTO().Profile);
             await UserStateService.SaveProfileStateAsync(profileModel.Username);
 
-			// Check if the user is new and navigate accordingly
+            // Check if the user is new and navigate accordingly
             if (isNewUser)
             {
                 await UserStateService.ClearProfileStateAsync();
@@ -295,18 +296,25 @@
     }
 
     // Method to handle navigation lock
-    private Task ConfirmNavigationAsync(LocationChangingContext context)
+    private async Task ConfirmNavigationAsync(LocationChangingContext context)
     {
+        // Always allow logout
         if (LogoutService.IsLoggingOut)
         {
-            return Task.CompletedTask;
+            await UserStateService.ClearProfileStateAsync();
+            return;
+
         }
 
+
+        // Do not allow them to go to other pages until the profile is complete
         if (isNewUser && profileModel.IsProfileIncomplete())
         {
             context.PreventNavigation();
+            await Notification.NotifyAndAwait("You must complete your profile and generate your first course\nto finish the onboarding process.");
+
         }
-        return Task.CompletedTask;
+        return;
     }
 
     // Method to build the default prompt(s) based on the current selections

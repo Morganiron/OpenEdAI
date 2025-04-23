@@ -37,8 +37,8 @@
 		<div class="button-container">
 			<!-- Validation of proper course plan object to display submit button -->
 			@if (UserStateService.CoursePlan is not null
-													&& UserStateService.CoursePlan.Title != "Warning"
-													&& UserStateService.CoursePlan.Lessons?.Any() == true)
+																			&& UserStateService.CoursePlan.Title != "Warning"
+																			&& UserStateService.CoursePlan.Lessons?.Any() == true)
 			{
 				<button class="button send-button" @onclick="SubmitCoursePlan">Choose this course plan</button>
 			}
@@ -58,6 +58,7 @@
 
 @code {
 	private bool hasCompletedSetup = true;
+	private bool isSubmitting = false;
 	private string currentUsername = string.Empty;
 
 	protected override async Task OnInitializedAsync()
@@ -260,8 +261,10 @@
 				// Set a flag in local storage to poll for new courses on the dashboard
 				await JS.InvokeVoidAsync("localStorage.setItem", "pollForNewCourse", "true");
 
-				// Update the hasCompletedSetup property
+				// Mark setup as complete and that the user is submitting
+				// (dont't show the notification that data may be lost)
 				hasCompletedSetup = true;
+				isSubmitting = true;
 
 				// Redirect to dashboard
 				Navigation.NavigateTo("/dashboard");
@@ -284,23 +287,30 @@
 
 	private async Task ConfirmNavigationAsync(LocationChangingContext context)
 	{
-		if (LogoutService.IsLoggingOut)
+		// If any user isSubmitting, they have completed setup - allow navigation - no warning
+		if (isSubmitting)
 		{
-			// Always allow logout
+			// Always allow an acitve submit
 			// Clear data
 			await UserStateService.ClearCourseDataAsync();
 			return;
 		}
 
-		// Completed setup and has generated a plan
-		if (UserStateService.CoursePlan != null && hasCompletedSetup)
+		// Always allow logout, but show data loss warning
+		if (LogoutService.IsLoggingOut)
 		{
-			// Allow navigation
+			// Show data loss warning
+			var confirm = await Notification.ConfirmAsync("You have not saved your course yet.\nAny information you've entered on this page may be lost when you leave.");
+			if (!confirm)
+			{
+				// User canceled the navigation
+				context.PreventNavigation();
+			}
 			return;
 		}
 
-		// New user - block navigation
-		if (!hasCompletedSetup && UserStateService.CoursePlan is null)
+		// New user - has not generated a course yet
+		if (!hasCompletedSetup )
 		{
 			// Only allow navigation to the profile page
 			if (context.TargetLocation.Contains("/profile"))
@@ -313,12 +323,13 @@
 			return;
 		}
 
-		// Everyone Else - show a notification to warn them of losing unsaved data
-		var confirm = await Notification.ConfirmAsync("Any information you've entered on this page may be lost when you leave.");
-		if (!confirm)
+		// Has completed setup, but is not submitting - keep stored data in window cache until new user logs in or time has expired
+		var conf = await Notification.ConfirmAsync("You have not saved your course yet.\nAny information you've entered on this page may be lost when you leave.");
+		if (!conf)
 		{
+			// User canceled the navigation
 			context.PreventNavigation();
 		}
-		// No need for an else, they will be able to navigate away.
+		
 	}
 }
