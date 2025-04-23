@@ -16,8 +16,8 @@
 @inject TokenManager TokenManager
 @inject ILogger<Profile> Logger
 
-<!-- Prevent navigation if required fields are not completed -->
-<NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
+<!-- Prevent navigation if required fields are not completed and if is a new user -->
+<NavigationLock ConfirmExternalNavigation="@(!LogoutService.IsLoggingOut)" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
 <div class="profile-container">
 

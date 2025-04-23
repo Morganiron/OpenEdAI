@@ -16,8 +16,8 @@
 @inject ILogger<GenerateCourse> Logger
 @inject UserStateService UserStateService
 
-<!-- Warn about data loss on any navigation -->
-<NavigationLock ConfirmExternalNavigation="true" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
+<!-- Warn about data loss on proper conditions -->
+<NavigationLock ConfirmExternalNavigation="@(!isSubmitting && !LogoutService.IsLoggingOut)" OnBeforeInternalNavigation="ConfirmNavigationAsync" />
 
 <div class="generate-course-container">
 	<h2>Create Your Custom Learning Path</h2>
