@@ -177,6 +177,42 @@ body {
     }
 }
 
+/* ========== Landing Page ========== */
+.landing-container {
+    max-width: 75%;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.landing-title {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.landing-subtitle {
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.2rem;
+    color: #555;
+    margin-bottom: 2rem;
+}
+
+.landing-description {
+    font-size: 1rem;
+    text-align: left;
+    color: #333;
+    max-width: 75%;
+    margin: 0 auto 2rem auto;
+    line-height: 1.6;
+}
+
+.landing-container button{
+    margin-top: 2rem;
+}
+
+
 /* ========== Dashboard ========== */
 .dashboard-grid {
     display: grid;

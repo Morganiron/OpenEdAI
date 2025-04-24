@@ -4,34 +4,51 @@
 @inject OpenEdAI.Client.Models.AuthConfig Auth
 @inject AuthenticationStateProvider AuthStateProvider
 
-<h1>Welcome to OpenEd AI</h1>
-<p>Personalized, AI-powered learning from free online resources.</p>
-@if (isAuthenticated)
-{
-	<button class="button" @onclick="GoToDashboard">Go to Dashboard</button>
-}
-else
-{
-	<button class="button" @onclick="Login">Login/Sign Up</button>
-}
+<div class="landing-container">
+    <h1 class="landing-title">Welcome to OpenEd AI</h1>
+    <p class="landing-subtitle">Your personalized gateway to smarter, AI-powered learning—completely free.</p>
 
+    <div class="landing-description">
+        <p>
+            OpenEd AI is designed to transform how you learn by combining advanced artificial intelligence with high-quality open educational content.
+            Whether you're exploring a new subject or deepening your current skills, OpenEd AI creates custom learning paths tailored just for you.
+        </p>
+        <p>
+            Just tell us what you're interested in, and our platform will craft a course plan filled with lessons, progress tracking, and resource links—all optimized for your learning style.
+        </p>
+        @if (isAuthenticated)
+        {
+            <button class="button" @onclick="GoToDashboard">Go to Dashboard</button>
+        }
+        else
+        {
+            <p>
+                <strong>Ready to start your journey? Log in or sign up and let OpenEd AI personalize your learning experience.</strong>
+            </p>
+            <button class="button" @onclick="Login">Sign in / Sign Up</button>
+        }
+        
+    </div>
+
+    
+</div>
 
 @code {
-	private bool isAuthenticated;
+    private bool isAuthenticated;
 
-	protected override async Task OnInitializedAsync()
-	{
-		var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-		isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
-	}
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+    }
 
-	private void GoToDashboard()
-	{
-		Navigation.NavigateTo("/dashboard", replace: true);
-	}
+    private void GoToDashboard()
+    {
+        Navigation.NavigateTo("/dashboard", replace: true);
+    }
 
-	private void Login()
-	{
-		Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
-	}
+    private void Login()
+    {
+        Navigation.NavigateTo(Auth.CognitoLoginUrl, forceLoad: true);
+    }
 }
