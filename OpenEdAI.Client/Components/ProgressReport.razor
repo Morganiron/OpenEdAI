@@ -49,29 +49,35 @@
 
 @code {
     [Parameter]
-    public List<CourseProgressDTO> ProgressData { get; set; }
-    [Parameter]
-    public  List<CourseDTO> Courses { get; set; }
+    public List<DashboardProgressDTO> ProgressData { get; set; }
+
     private List<ProgressReportRow> reportRows;
+
+    // Called on every re-render when the parent passes new ProgressData
+    protected override void OnParametersSet()
+    {
+        // If we already have generated a report, recompute it
+        if (reportRows != null)
+        {
+            GenerateReport();
+        }
+    }
 
     private void GenerateReport()
     {
-        if (ProgressData == null || Courses == null)
+        if (ProgressData == null)
             return;
 
-        reportRows = ProgressData.Select(progress =>
-        {
-            var course = Courses.FirstOrDefault(c => c.CourseID == progress.CourseID);
-
-            return new ProgressReportRow
+        reportRows = ProgressData
+            .Select(progress => new ProgressReportRow
                 {
-                    CourseTitle = course?.Title ?? "Unknown",
+                    CourseTitle = progress.CourseTitle,
                     LessonsCompleted = progress.LessonsCompleted,
-                    TotalLessons = course?.LessonIds?.Count ?? 0,
+                    TotalLessons = progress.TotalLessons,
                     CompletionPercentage = progress.CompletionPercentage,
                     LastUpdated = progress.LastUpdated
-                };
-        }).ToList();
+                })
+                .ToList();
     }
 
 

@@ -42,14 +42,14 @@
 
 	<!-- Right Column: Progress Report -->
 	<div class="column-2">
-		<ProgressReport ProgressData="progressData" Courses="courses" />
+		<ProgressReport ProgressData="progressData" />
 	</div>
 </div>
 
 @code {
 
 	private List<CourseDTO> courses;
-	private List<CourseProgressDTO> progressData;
+	private List<DashboardProgressDTO> progressData;
 	private string searchQuery = "";
 	private Timer refreshTimer;
 	private int previousCourseCount = 0;
@@ -79,7 +79,7 @@
 	protected override async Task OnInitializedAsync()
 	{
 		courses = await CourseService.GetEnrolledCoursesAsync();
-		progressData = await ProgressService.GetUserProgressAsync();
+		progressData = await ProgressService.GetDashboardProgressAsync();
 
 		// Check if polling needs to start after course creation
 		var pollFlag = await JS.InvokeAsync<string>("localStorage.getItem", "pollForNewCourse");
@@ -103,7 +103,7 @@
 		if (success)
 		{
 			courses = await CourseService.GetEnrolledCoursesAsync();
-			progressData = await ProgressService.GetUserProgressAsync();
+			progressData = await ProgressService.GetDashboardProgressAsync();
 			await InvokeAsync(StateHasChanged);
 		}
 		else
@@ -128,7 +128,7 @@
 				previousCourseCount = courses.Count;
 
 				// Update the progress data for the progress report
-				progressData = await ProgressService.GetUserProgressAsync();
+				progressData = await ProgressService.GetDashboardProgressAsync();
 
 				// Clear the poll flag from local storage
 				await JS.InvokeVoidAsync("localStorage.removeItem", "pollForNewCourse");
@@ -155,16 +155,30 @@
 	// Retrieve user's progress for a specific course
 	private CourseProgressDTO GetProgressForCourse(int courseId)
 	{
-		return progressData.FirstOrDefault(p => p.CourseID == courseId)
-			?? new CourseProgressDTO
-				{
-					CourseID = courseId,
-					UserID = "",
-					UserName = "",
-					LessonsCompleted = 0,
-					CompletedLessons = new List<int>(),
-					CompletionPercentage = 0,
-					LastUpdated = DateTime.UtcNow
-				};
+		// find matching dashboard record
+		var dash = progressData.FirstOrDefault(p => p.CourseID == courseId);
+
+		// Create a default CourseProgressDTO
+		var newDTO = new CourseProgressDTO
+			{
+				ProgressID = 0,
+				UserID = string.Empty,
+				UserName = string.Empty,
+				CourseID = courseId,
+				LessonsCompleted = 0,
+				CompletedLessons = new List<int>(),
+				CompletionPercentage = 0,
+				LastUpdated = DateTime.UtcNow
+			};
+
+		// If a matching record is found, update the newDTO with its values
+		if (dash != null)
+		{
+			newDTO.LessonsCompleted = dash.LessonsCompleted;
+			newDTO.CompletionPercentage = dash.CompletionPercentage;
+			newDTO.LastUpdated = dash.LastUpdated;
+		}
+
+		return newDTO;
 	}
 }
