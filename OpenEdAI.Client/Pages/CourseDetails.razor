@@ -130,11 +130,16 @@ else
 
 	private async Task MarkLessonCompleted(int lessonId)
 	{
-		// Invoke the patch
+		// Send the update to the server
 		await ProgressService.MarkLessonCompleteAsync(Progress.ProgressID, lessonId);
 
-		// Update the local state so the UI shows "Completed"
+		// Update the local state so the UI shows "Completed" and the progress circle updates
 		Progress.CompletedLessons.Add(lessonId);
+		Progress.LessonsCompleted = Progress.CompletedLessons.Count;
+		Progress.CompletionPercentage = Math.Floor((double)Progress.LessonsCompleted / Lessons.Count * 100);
+
+		// Trigger a re-render
+		await InvokeAsync(StateHasChanged);
 	}
 
 }
