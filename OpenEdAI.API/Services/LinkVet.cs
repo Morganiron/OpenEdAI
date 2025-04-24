@@ -139,9 +139,9 @@
                 if (res.IsSuccessStatusCode)
                     return res.Content.Headers.ContentType?.MediaType;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogWarning(ex, "HEAD request failed, falling back to GET");
+                _logger.LogWarning("HEAD request failed, falling back to GET");
             }
 
             // Some websites do not support HEAD requests, so fallback to GET
@@ -155,10 +155,10 @@
                     ? res.Content.Headers.ContentType?.MediaType
                     : null;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // Log the exception if needed
-                _logger.LogError(ex, "Error checking URL in LinkVet");
+                // Failed, so skip
+                _logger.LogWarning("Error checking URL in LinkVet");
                 return null;
             }
 
