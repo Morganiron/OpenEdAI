@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	<EnableCssIsolation>true</EnableCssIsolation>
+	<UserSecretsId>0115ada2-dc0f-407c-9e58-7cd08aa39a3a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

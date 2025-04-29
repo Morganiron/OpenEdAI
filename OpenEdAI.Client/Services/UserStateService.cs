@@ -12,6 +12,7 @@ namespace OpenEdAI.Client.Services
         private const string PlanStorageKey = "cached_generated_plan";
         private const string ChatMessageKey = "cached_chat_messages";
         private const string InputStorageKey = "cached_course_input";
+        private const string CreatingStudentKey = "creating_student_flag";
         private const int StorageExpriationHours = 1;
 
         private readonly IJSRuntime _js;
@@ -75,6 +76,23 @@ namespace OpenEdAI.Client.Services
             ClearCoursePlanAsync(),
             ClearChatMessagesAsync(),
             ClearCourseInputAsync());
+        }
+
+        // === CREATING STUDENT METHODS ===
+        public async Task MarkCreatingStudentAsync()
+        {
+            await _js.InvokeVoidAsync("localStorage.setItem", CreatingStudentKey, "true");
+        }
+
+        public async Task<bool> IsCreatingStudentAsync()
+        {
+            var value = await _js.InvokeAsync<string>("localStorage.getItem", CreatingStudentKey);
+            return value == "true";
+        }
+
+        public async Task ClearCreatingStudentFlagAsync()
+        {
+            await _js.InvokeVoidAsync("localStorage.removeItem", CreatingStudentKey);
         }
 
         // === PROFILE METHODS ===

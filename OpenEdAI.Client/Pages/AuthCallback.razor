@@ -2,6 +2,7 @@
 @using System.Text.Json
 @using OpenEdAI.Client.Models
 @using OpenEdAI.Client.Shared
+@using OpenEdAI.Client.Services
 @page "/auth-callback"
 @inject Services.LoadingService Loader
 @inject NavigationManager Navigation
@@ -10,11 +11,15 @@
 @inject Services.TokenManager TokenManager
 @inject Services.StudentService StudentService
 @inject ILogger<AuthCallback> Logger
+@inject UserStateService UserStateService
+
 
 <GlobalLoading /> 
 
 @code {
 	private bool _hasExchangedCode = false;
+	// Ensures that only one thread or task can enter at a time
+	private static readonly SemaphoreSlim _navLock = new SemaphoreSlim(1, 1);
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -23,6 +28,7 @@
 		if (!string.IsNullOrWhiteSpace(existingToken) && existingToken != "null" && TokenManager.IsTokenValid(existingToken))
 		{
 			_hasExchangedCode = true;
+			//Logger.LogInformation($"OnInitializedAsync calling DeterminPostAuthNavigation.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
 			await DeterminePostAuthNavigation();
 			return;
 		}
@@ -115,27 +121,58 @@
 	// Determine whether the student has completed the initial setup and navigate accordingly
 	private async Task DeterminePostAuthNavigation()
 	{
+		//Logger.LogInformation($"DeterminePostAuthNavigation started.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
+
+		// Serialize access to the method and skip duplicate calls
+		if (!await _navLock.WaitAsync(0))
+		{
+			Logger.LogWarning("Navigation already in progress. Skipping duplicate call.");
+			return;
+		}
+
 		try
 		{
-			// Retrieve the student data using the StudentService
+			// Check if already creating the student
+			//Logger.LogInformation($"Checking if isCreating.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
+			var creating = await UserStateService.IsCreatingStudentAsync();
+			if (creating)
+			{
+				// Do not retry while a create is in progress
+				//Logger.LogInformation($"isCreating = true. Returning.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
+				return;
+			}
+
+			// Try to retrieve the student data using the StudentService
 			var student = await StudentService.GetCurrentStudentAsync();
 
 			if (student == null)
 			{
+				// Release _navlock
+				_navLock.Release();
 				Navigation.NavigateTo("/", replace: true);
 				return;
 			}
 
 			if (!student.HasCompletedSetup && (student.Profile == null || string.IsNullOrWhiteSpace(student.Profile.EducationLevel)))
 			{
+
+				await UserStateService.ClearCreatingStudentFlagAsync();
+				// Release _navlock
+				_navLock.Release();
 				Navigation.NavigateTo("/profile", replace: true);
 			}
 			else if (!student.HasCompletedSetup)
 			{
+				await UserStateService.ClearCreatingStudentFlagAsync();
+				// Release _navlock
+				_navLock.Release();
 				Navigation.NavigateTo("/generate-course", replace: true);
 			}
 			else
 			{
+				await UserStateService.ClearCreatingStudentFlagAsync();
+				// Release _navlock
+				_navLock.Release();
 				Navigation.NavigateTo("/dashboard", replace: true);
 			}
 		}
@@ -144,36 +181,66 @@
 			// If the user is authenticated, but the student record doesn't exist (404), create one
 			if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
 			{
+				//Logger.LogInformation($"404 - student not found. Creating one. Setting isCreating = true.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
+				// Mark that a new student is being created
+				await UserStateService.MarkCreatingStudentAsync();
+
 				try
 				{
+					//Logger.LogInformation($"Calling POST. \nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
 					// Call POST /api/students to create a new student record
 					var response = await Http.PostAsync("api/students", null);
 
 					if (response.IsSuccessStatusCode)
 					{
-						// Successfully created a new student record, try again
+						//Logger.LogInformation($"response.IsSuccessStatusCode = true. Clearing isCreating flag.\nTimestamp:{DateTime.UtcNow.ToString("hh:mm:ss:FFF")}\n\n");
+
+						// Successfully created a new student record
+						// Clear the creating state flag
+						await UserStateService.ClearCreatingStudentFlagAsync();
+
+						// Release _navlock
+						_navLock.Release();
+
+						await Task.Delay(500); // Give the DB a little time to finish
+
+						// Attempt to determine post-auth navigation again
 						await DeterminePostAuthNavigation();
-						return;
 					}
 					else
 					{
 						Logger.LogError($"Failed to create student record. Status: {response.StatusCode}");
+						await UserStateService.ClearCreatingStudentFlagAsync();
+						// Release _navlock
+						_navLock.Release();
 						Navigation.NavigateTo("/", forceLoad: false);
 					}
 				}
 				catch (Exception createEx)
 				{
 					Logger.LogError($"Error creating a new student: {createEx.Message}");
+					await UserStateService.ClearCreatingStudentFlagAsync();
+					// Release _navlock
+					_navLock.Release();
 					Navigation.NavigateTo("/", replace: true);
 				}
-		}
-
-
-			Logger.LogError($"Error during post-authentication navigation: {ex.Message}");
-			Navigation.NavigateTo("/", forceLoad: false);
+			}
+			else
+			{
+				Logger.LogError($"Error during post-authentication navigation: {ex.Message}");
+				// Release _navlock
+				_navLock.Release();
+				Navigation.NavigateTo("/", forceLoad: false);
+			}			
 		}
 		finally
 		{
+			// This might still run if none of the other early returns happened
+			if (_navLock.CurrentCount == 0)
+			{
+				// Release _navlock
+				_navLock.Release();
+			}
 			Loader.Hide();
 		}
 	}
