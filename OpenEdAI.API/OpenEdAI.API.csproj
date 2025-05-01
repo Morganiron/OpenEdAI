@@ -8,6 +8,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Configurations\**" />
+    <Compile Remove="Middleware\**" />
+    <Compile Remove="Repositories\**" />
+    <Content Remove="Configurations\**" />
+    <Content Remove="Middleware\**" />
+    <Content Remove="Repositories\**" />
+    <EmbeddedResource Remove="Configurations\**" />
+    <EmbeddedResource Remove="Middleware\**" />
+    <EmbeddedResource Remove="Repositories\**" />
+    <None Remove="Configurations\**" />
+    <None Remove="Middleware\**" />
+    <None Remove="Repositories\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Amazon.Extensions.CognitoAuthentication" Version="2.5.5" />
     <PackageReference Include="AWSSDK.CognitoIdentityProvider" Version="3.7.407" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.400" />
@@ -33,12 +48,6 @@
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0-preview.3.efcore.9.0.0" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql.Design" Version="1.1.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Configurations\" />
-    <Folder Include="Middleware\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
 </Project>

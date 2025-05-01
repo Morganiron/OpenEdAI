@@ -391,3 +391,4 @@ docker-compose.yml
 *.patch
 /structure.txt
 /project-structure.txt
+/OpenEdAI.API/project-structure.txt
