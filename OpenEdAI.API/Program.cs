@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using OpenAI;
+using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
 
@@ -32,24 +33,25 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     if (builder.Environment.IsDevelopment())
     {
-// Retrieve the HTTPS configuration from User Secrets (or other configuration sources)
-var httpsConfig = builder.Configuration.GetSection("Https");
-var certPath = httpsConfig.GetValue<string>("CertificatePath");
-var certPassword = httpsConfig.GetValue<string>("CertificatePassword");
+        // Retrieve the HTTPS configuration from User Secrets (or other configuration sources)
+        var httpsConfig = builder.Configuration.GetSection("Https");
+        var certPath = httpsConfig.GetValue<string>("CertificatePath");
+        var certPassword = httpsConfig.GetValue<string>("CertificatePassword");
 
-// Configure Kestrel to listen on port 80 for HTTP and 443 for HTTPS (using certificate from configuration)
-builder.WebHost.ConfigureKestrel(serverOptions =>
-{
-    serverOptions.ListenAnyIP(5070); // Always allow HTTP for internal/ALB
-
-    // Listen on 443 with HTTPS using the certificate path and password
-    serverOptions.ListenAnyIP(7148, listenOptions =>
+        serverOptions.ListenAnyIP(5070); // HTTP
+        serverOptions.ListenAnyIP(7148, listenOptions =>
+        {
+            listenOptions.UseHttps(certPath, certPassword); // HTTPS only in development
+        });
+    }
+    else
     {
-        listenOptions.UseHttps(certPath, certPassword);
-    });
+        // HTTP only in production (CloudFront or ALB handles HTTPS)
+        serverOptions.ListenAnyIP(80); 
+    }
 });
 
-// Add CORS service 
+// CORS policy for local development
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontendDev", policy =>
@@ -67,9 +69,9 @@ builder.Configuration.Bind(appSettings);
 // Set cogntio settings 
 var cognito = appSettings.AWS?.Cognito;
 if (cognito == null || string.IsNullOrEmpty(cognito.UserPoolId) || string.IsNullOrEmpty(cognito.AppClientId))
-    {
+{
     throw new InvalidOperationException("AWS Cognito settings are missing. Please configure.");
-    }
+}
 
 // Set the region
 var region = appSettings.AWS?.Region;
@@ -78,28 +80,30 @@ if (string.IsNullOrEmpty(region))
     throw new InvalidOperationException("AWS Region is missing. Please configure.");
 }
 
+builder.Services.Configure<AppSettings>(builder.Configuration);
+
+// Get the connection string depending on the environment
+var connectionString =
+    builder.Configuration["ConnectionStrings:DefaultConnection"] ??        // AppSettings or SecretsManager
+    builder.Configuration.GetConnectionString("DefaultConnection") ??      // Named connection string fallback
+    Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection"); // Environment variable override
+
 if (string.IsNullOrEmpty(connectionString))
 {
     throw new InvalidOperationException("Database connection string is missing.");
 }
 
-// Add application services
-builder.Services.AddControllers();
-builder.Services.AddAWSService<IAmazonCognitoIdentityProvider>();
-builder.Services.AddHttpClient();
-
-// Register OpenAI client with the API key from configuration
+// Register the OpenAI client with the API key from configuration
 builder.Services.AddSingleton(sp =>
 {
     var openAIKey = appSettings.OpenAI.LearningPathKey
-        ?? throw new InvalidOperationException("Missing OpenAi:LearningPathKey");
+    ?? throw new InvalidOperationException("Missing OpenAi:LearningPathKey");
     return new OpenAIClient(new OpenAIAuthentication(openAIKey));
 });
 
 // Register the AI-driven plan and content search services
 builder.Services.AddSingleton<AIDrivenSearchPlanService>();
 builder.Services.AddSingleton<IContentSearchService, AIDrivenContentSearchService>();
-
 
 // Backround task and search services (backround queue capacity set to 100)
 builder.Services.AddSingleton<IBackgroundTaskQueue>(new BackgroundTaskQueue(100));
@@ -110,34 +114,6 @@ JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 // Configure AWS options
 builder.Services.Configure<AWSOptions>(builder.Configuration.GetSection("AWS"));
-
-// Logging for model binding failures
-builder.Services.Configure<ApiBehaviorOptions>(options =>
-{
-    options.InvalidModelStateResponseFactory = context =>
-    {
-        var problemDetails = new ValidationProblemDetails(context.ModelState)
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-            Title = "One or more validation errors occurred.",
-            Detail = "See the errors property for more details.",
-            Instance = context.HttpContext.Request.Path
-        };
-
-        Console.WriteLine("Model binding failed:");
-        foreach (var kvp in context.ModelState)
-        {
-            foreach (var error in kvp.Value.Errors)
-            {
-                Console.WriteLine($" - {kvp.Key}: {error.ErrorMessage}");
-            }
-        }
-
-        return new BadRequestObjectResult(problemDetails);
-    };
-});
-
 
 // Cognito Authority URL
 var cognitoAuthority = $"https://cognito-idp.{region}.amazonaws.com/{cognito.UserPoolId}";
@@ -187,7 +163,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 // Retrieve the client_id from the token and compare it with expected value
                 var tokenClientId = context.Principal.FindFirst("client_id")?.Value;
 
-                if (string.IsNullOrWhiteSpace(tokenClientId) || tokenClientId.Trim() != appClientId.Trim())
+                if (string.IsNullOrWhiteSpace(tokenClientId) || tokenClientId.Trim() != cognito.AppClientId.Trim())
                 {
                     context.Fail("Invalid client_id.");
                 }
@@ -196,6 +172,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
 
     });
+
+// Logging for model binding failures
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var problemDetails = new ValidationProblemDetails(context.ModelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+            Title = "One or more validation errors occurred.",
+            Detail = "See the errors property for more details.",
+            Instance = context.HttpContext.Request.Path
+        };
+
+        Console.WriteLine("Model binding failed:");
+        foreach (var kvp in context.ModelState)
+        {
+            foreach (var error in kvp.Value.Errors)
+            {
+                Console.WriteLine($" - {kvp.Key}: {error.ErrorMessage}");
+            }
+        }
+
+        return new BadRequestObjectResult(problemDetails);
+    };
+});
+
+// Add application services
+builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 // Add authorization service
 builder.Services.AddAuthorization();
