@@ -7,23 +7,31 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using OpenAI;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register AWSSecretsManagerService to DI container
-builder.Services.AddSingleton<AWSSecretsManagerService>();
-
-// Load configurations from appsettings.json, appsettings.Development.json, user secrets and environment variables
+// Load all configuration sources
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddUserSecrets<Program>()
     .AddEnvironmentVariables();
 
+// Load AWS secrets only if not in Development
+if (!builder.Environment.IsDevelopment())
+{
+    var secrets = await SecretsManagerConfigLoader.LoadSecretsAsync();
+    builder.Configuration.AddInMemoryCollection(secrets);
+}
+
+// Configure Kestrel differently for Development vs Production
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    if (builder.Environment.IsDevelopment())
+    {
 // Retrieve the HTTPS configuration from User Secrets (or other configuration sources)
 var httpsConfig = builder.Configuration.GetSection("Https");
 var certPath = httpsConfig.GetValue<string>("CertificatePath");
@@ -52,32 +60,23 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Conditionally load secrets from AWS Secrets Manager in not in Development. (hosted on AWS)
-if (!builder.Environment.IsDevelopment())
-{
-    var secretsManagerService = builder.Services.BuildServiceProvider().GetRequiredService<AWSSecretsManagerService>();
+// Load and bind the config objects
+var appSettings = new AppSettings();
+builder.Configuration.Bind(appSettings);
 
-    // Retrieve app secrets (ClientSecret, DefaultConnection, etc.)
-    var appSecrets = await secretsManagerService.GetAppSecretsAsync();
-    // Add secrets to configuration
-    foreach (var secret in appSecrets)
+// Set cogntio settings 
+var cognito = appSettings.AWS?.Cognito;
+if (cognito == null || string.IsNullOrEmpty(cognito.UserPoolId) || string.IsNullOrEmpty(cognito.AppClientId))
     {
-        builder.Configuration[secret.Key] = secret.Value;
+    throw new InvalidOperationException("AWS Cognito settings are missing. Please configure.");
     }
-    // Retrieve OpenAI key
-    var openAiKey = await secretsManagerService.GetOpenAiKeyAsync();
-    builder.Configuration["OpenAi_LearningPathKey"] = openAiKey;
 
-}
-else
+// Set the region
+var region = appSettings.AWS?.Region;
+if (string.IsNullOrEmpty(region))
 {
-    // In development, the configuration values are expected to be present
-    // in appsettings.Development.json, user secrets, or environment variables
-    Console.WriteLine("Development mode detected - skipping AWS Secrets Manager integration.");
+    throw new InvalidOperationException("AWS Region is missing. Please configure.");
 }
-// Get the connection string for the database
-var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrEmpty(connectionString))
 {
@@ -92,9 +91,9 @@ builder.Services.AddHttpClient();
 // Register OpenAI client with the API key from configuration
 builder.Services.AddSingleton(sp =>
 {
-    var apiKey = builder.Configuration["OpenAi:LearningPathKey"]
+    var openAIKey = appSettings.OpenAI.LearningPathKey
         ?? throw new InvalidOperationException("Missing OpenAi:LearningPathKey");
-    return new OpenAIClient(new OpenAIAuthentication(apiKey));
+    return new OpenAIClient(new OpenAIAuthentication(openAIKey));
 });
 
 // Register the AI-driven plan and content search services
@@ -111,17 +110,6 @@ JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 // Configure AWS options
 builder.Services.Configure<AWSOptions>(builder.Configuration.GetSection("AWS"));
-
-// Retrieve AWS Cognito settings from environment variables or configuration
-var userPoolId = Environment.GetEnvironmentVariable("AWS:Cognito:UserPoolId")
-                 ?? builder.Configuration.GetValue<string>("AWS:Cognito:UserPoolId");
-
-var appClientId = Environment.GetEnvironmentVariable("AWS:Cognito:AppClientId")
-                  ?? builder.Configuration.GetValue<string>("AWS:Cognito:AppClientId");
-
-var awsRegion = Environment.GetEnvironmentVariable("AWS:Region")
-                ?? builder.Configuration.GetValue<string>("AWS:Region");
-
 
 // Logging for model binding failures
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -150,14 +138,9 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-// Ensure AWS Cognito settings are provided
-if (string.IsNullOrEmpty(userPoolId) || string.IsNullOrEmpty(appClientId))
-{
-    throw new InvalidOperationException("AWS Cognito settings are missing. Please configure.");
-}
 
 // Cognito Authority URL
-var cognitoAuthority = $"https://cognito-idp.{awsRegion}.amazonaws.com/{userPoolId}";
+var cognitoAuthority = $"https://cognito-idp.{region}.amazonaws.com/{cognito.UserPoolId}";
 
 // Register Database Context with MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -167,7 +150,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     )
 );
 
-// Retireve teh OpenID Connect configuration from Cognito for token validation
+// Retireve the OpenID Connect configuration from Cognito for token validation
 var configurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
     $"{cognitoAuthority}/.well-known/openid-configuration",
     new OpenIdConnectConfigurationRetriever(),
