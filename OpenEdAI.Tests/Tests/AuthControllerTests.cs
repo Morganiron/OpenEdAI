@@ -2,8 +2,10 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Moq.Protected;
+using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Controllers;
 using OpenEdAI.API.DTOs;
 
@@ -34,6 +36,25 @@ namespace OpenEdAI.Tests.Tests
             };
         }
 
+        // Method to get the settings from Appsettings
+        private static IOptions<AppSettings> GetSettings()
+        {
+            return Options.Create(new AppSettings
+            {
+                AWS = new AWSSettings
+                {
+                    Cognito = new CognitoSettings
+                    {
+                        AppClientId = "id",
+                        ClientSecret = "secret",
+                        RedirectUri = "https://r",
+                        Domain = "domain"
+                    }
+                }
+                
+            });
+        }
+
         [Fact]
         public async Task ExchangeCode_NonSuccess_ReturnsUnauthorized()
         {
@@ -43,14 +64,10 @@ namespace OpenEdAI.Tests.Tests
                    .Returns(CreateHttpClient(HttpStatusCode.BadRequest, "{}"));
 
             // Set up a mock configuration object
-            var config = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
-            config.Setup(c => c["AWS:Cognito:AppClientId"]).Returns("id");
-            config.Setup(c => c["AWS:Cognito:ClientSecret"]).Returns("secret");
-            config.Setup(c => c["AWS:Cognito:RedirectUri"]).Returns("https://r");
-            config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
+            var settings = GetSettings();
 
             var logger = new Mock<ILogger<AuthController>>();
-            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+            var ctrl = new AuthController(settings, factory.Object, logger.Object);
 
 
             // Act: call the ExchangeCode method with a dummy code
@@ -78,14 +95,10 @@ namespace OpenEdAI.Tests.Tests
                    .Returns(CreateHttpClient(HttpStatusCode.OK, json));
 
             // Set up a mock configuration object
-            var config = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
-            config.Setup(c => c["AWS:Cognito:AppClientId"]).Returns("id");
-            config.Setup(c => c["AWS:Cognito:ClientSecret"]).Returns("secret");
-            config.Setup(c => c["AWS:Cognito:RedirectUri"]).Returns("https://r");
-            config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
+            var settings = GetSettings();
 
             var logger = new Mock<ILogger<AuthController>>();
-            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+            var ctrl = new AuthController(settings, factory.Object, logger.Object);
 
 
             // Act: call the ExchangeCode method with a dummy code
@@ -108,14 +121,11 @@ namespace OpenEdAI.Tests.Tests
                    .Returns(CreateHttpClient(HttpStatusCode.Unauthorized, "{}"));
 
             // Set up a mock configuration object
-            var config = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
-            config.Setup(c => c["AWS:Cognito:AppClientId"]).Returns("id");
-            config.Setup(c => c["AWS:Cognito:ClientSecret"]).Returns("secret");
-            config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
+            var settings = GetSettings();
 
             // Create the controller with the mocked configuration and HttpClient
             var logger = new Mock<ILogger<AuthController>>();
-            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+            var ctrl = new AuthController(settings, factory.Object, logger.Object);
 
 
             // Act: call the RefreshToken method with a dummy refresh token
@@ -145,14 +155,11 @@ namespace OpenEdAI.Tests.Tests
                    .Returns(CreateHttpClient(HttpStatusCode.OK, json));
 
             // Set up a mock configuration object
-            var config = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
-            config.Setup(c => c["AWS:Cognito:AppClientId"]).Returns("id");
-            config.Setup(c => c["AWS:Cognito:ClientSecret"]).Returns("secret");
-            config.Setup(c => c["AWS:Cognito:Domain"]).Returns("domain");
+            var settings = GetSettings();
 
             // Create the controller with the mocked configuration and HttpClient
             var logger = new Mock<ILogger<AuthController>>();
-            var ctrl = new AuthController(config.Object, factory.Object, logger.Object);
+            var ctrl = new AuthController(settings, factory.Object, logger.Object);
 
             // Act: call the RefreshToken method with a dummy refresh token
             var actionResult = await ctrl.RefreshToken(new RefreshTokenRequest { RefreshToken = "x" });

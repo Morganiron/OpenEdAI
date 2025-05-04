@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using OpenEdAI.API.Controllers;
+using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
 using OpenEdAI.API.Services;
@@ -19,7 +21,6 @@ namespace OpenEdAI.Tests.Tests
         private readonly Mock<IContentSearchService> _mockSearch;
         private readonly Mock<IServiceScopeFactory> _mockScope;
         private readonly Mock<ILogger<AIAssistantController>> _mockLogger;
-        private readonly Mock<IConfiguration> _mockConfig;
 
         public AIAssistantControllerTests()
         {
@@ -28,22 +29,29 @@ namespace OpenEdAI.Tests.Tests
             _mockSearch = new();
             _mockScope = new();
             _mockLogger = new();
-            _mockConfig = new();
         }
 
         public void Dispose() => _context.Dispose();
 
+        private static IOptions<AppSettings> CreateSettings(string? apiKey)
+        {
+            return Options.Create(new AppSettings
+            {
+                OpenAI = new OpenAISettings { LearningPathKey = apiKey }
+            });
+        }
+
         [Fact]
         public void Ctor_MissingApiKey_Throws()
         {
-            // Arrange: no OpenAi key in config
-            _mockConfig.Setup(c => c["OpenAi:LearningPathKey"]).Returns<string>(null);
+            // Arrange: inject empty settings (simulate missing key)
+            var settings = CreateSettings(null);
 
             // Act / Assert
             Assert.Throws<InvalidOperationException>(() =>
                 new AIAssistantController(
                     _context,
-                    _mockConfig.Object,
+                    settings,
                     _mockLogger.Object,
                     _mockQueue.Object,
                     _mockSearch.Object,
@@ -54,11 +62,11 @@ namespace OpenEdAI.Tests.Tests
         public async Task GenerateCourse_NoToken_ReturnsUnauthorized()
         {
             // Arrange: Set up the mock config with a valid API key
-            _mockConfig.Setup(c => c["OpenAi:LearningPathKey"]).Returns("sk-test-key");
+            var settings = CreateSettings("sk-test-key");
 
             var ctrl = new AIAssistantController(
                 _context,
-                _mockConfig.Object,
+                settings,
                 _mockLogger.Object,
                 _mockQueue.Object,
                 _mockSearch.Object,
@@ -80,11 +88,11 @@ namespace OpenEdAI.Tests.Tests
         public async Task GenerateCourse_NoProfile_ReturnsBadRequest()
         {
             // Arrange: Set up the mock config with a valid API key
-            _mockConfig.Setup(c => c["OpenAi:LearningPathKey"]).Returns("sk-test-key");
+            var settings = CreateSettings("sk-test-key");
 
             var ctrl = new AIAssistantController(
                 _context,
-                _mockConfig.Object,
+                settings,
                 _mockLogger.Object,
                 _mockQueue.Object,
                 _mockSearch.Object,
