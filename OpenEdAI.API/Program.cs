@@ -202,6 +202,29 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+if (args.Contains("--migrate-only"))
+{
+    using var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var strategy = context.Database.CreateExecutionStrategy();
+
+    await strategy.ExecuteAsync(async () =>
+    {
+        var pending = await context.Database.GetPendingMigrationsAsync();
+
+        if (pending.Any())
+        {
+            Console.WriteLine($"Pending migrations: {string.Join(", ", pending)}");
+            await context.Database.MigrateAsync();
+        }
+        else
+        {
+            Console.WriteLine("No pending migrations.");
+        }
+    });
+    return; // skip app.Run()
+}
+
 // Inject logger factory into LinkVet
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 LinkVet.Initialize(loggerFactory);
