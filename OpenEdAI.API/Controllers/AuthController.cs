@@ -2,6 +2,8 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using OpenEdAI.API.Configuration;
 using OpenEdAI.API.DTOs;
 
 namespace OpenEdAI.API.Controllers
@@ -17,13 +19,14 @@ namespace OpenEdAI.API.Controllers
         private readonly string _tokenEndpoint;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IConfiguration config, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger)
+        public AuthController(IOptions<AppSettings> settings, IHttpClientFactory httpClientFactory, ILogger<AuthController> logger)
         {
             _http = httpClientFactory.CreateClient();
-            _clientId = config["AWS:Cognito:AppClientId"];
-            _clientSecret = config["AWS:Cognito:ClientSecret"];
-            _redirectUri = config["AWS:Cognito:RedirectUri"];
-            _tokenEndpoint = $"https://{config["AWS:Cognito:Domain"]}/oauth2/token";
+            var cognito = settings.Value.AWS.Cognito;
+            _clientId = cognito.AppClientId;
+            _clientSecret = cognito.ClientSecret;
+            _redirectUri = cognito.RedirectUri;
+            _tokenEndpoint = $"https://{cognito.Domain}/oauth2/token";
             _logger = logger;
         }
 

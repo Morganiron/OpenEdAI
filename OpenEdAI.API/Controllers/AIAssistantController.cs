@@ -2,9 +2,11 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
+using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.DTOs;
 using OpenEdAI.API.Models;
@@ -22,10 +24,11 @@ namespace OpenEdAI.API.Controllers
         private readonly IBackgroundTaskQueue _backgroundTaskQueue;
         private readonly IContentSearchService _contentSearchService;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly AppSettings _settings;
 
         public AIAssistantController(
             ApplicationDbContext context,
-            IConfiguration configuration,
+            IOptions<AppSettings> settings,
             ILogger<AIAssistantController> logger,
             IBackgroundTaskQueue backgroundTaskQueue,
             IContentSearchService contentSearchService,
@@ -36,9 +39,10 @@ namespace OpenEdAI.API.Controllers
             _backgroundTaskQueue = backgroundTaskQueue;
             _contentSearchService = contentSearchService;
             _serviceScopeFactory = serviceScopeFactory;
+            _settings = settings.Value;
 
             // Retrieve the API key from configuration
-            var apiKey = configuration["OpenAi:LearningPathKey"];
+            var apiKey = _settings.OpenAI.LearningPathKey;
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new InvalidOperationException("OpenAI API key is not configured");

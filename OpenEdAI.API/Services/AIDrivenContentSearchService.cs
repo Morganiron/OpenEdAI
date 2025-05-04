@@ -2,6 +2,8 @@
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using OpenEdAI.API.DTOs;
+using OpenEdAI.API.Configuration;
+using Microsoft.Extensions.Options;
 
 
 namespace OpenEdAI.API.Services
@@ -14,18 +16,16 @@ namespace OpenEdAI.API.Services
         private readonly string _cseId;
         private readonly ILogger<AIDrivenContentSearchService> _logger;
 
-        public AIDrivenContentSearchService(AIDrivenSearchPlanService planSvc, IConfiguration config, ILogger<AIDrivenContentSearchService> logger)
+        public AIDrivenContentSearchService(AIDrivenSearchPlanService planSvc, IOptions<AppSettings> settings, ILogger<AIDrivenContentSearchService> logger)
         {
             _planSvc = planSvc;
             _logger = logger;
 
-            // Read the ApiKey from appsettings.Development.json
-            var apiKey = config["GoogleApis:ApiKey"]
-                ?? throw new InvalidOperationException("Missing GoogleApis:ApiKey");
+            var apiKey = settings.Value.GoogleAPIs.ApiKey
+                ?? throw new InvalidOperationException("Missing GoogleApis.ApiKey");
 
-            // Read the Custom Search Engine Id
-            _cseId = config["GoogleApis:CustomSearchEngineId"]
-                ?? throw new InvalidOperationException("Missing GoogleApis:CustomSearchEngineId");
+            _cseId = settings.Value.GoogleAPIs.CustomSearchEngineId
+                ?? throw new InvalidOperationException("Missing GoogleApis.CustomSearchEngineId");
 
             _youTube = new YouTubeService(new BaseClientService.Initializer
             {
@@ -38,7 +38,6 @@ namespace OpenEdAI.API.Services
                 ApiKey = apiKey,
                 ApplicationName = "OpenEdAI"
             });
-
         }
 
         // Generates an AI-driven search plan for the given course input and student profile
