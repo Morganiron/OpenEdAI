@@ -12,8 +12,18 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Call AddOptions() so that .Configure<AuthConfig>() works
 builder.Services.AddOptions();
 
+// Detect the environment
+var env = builder.HostEnvironment.Environment;
+
+// Load additional config file manually if in Production
+if (env == "Production")
+{
+    using var http = new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) };
+    var jsonStream = await http.GetStreamAsync("appsettings.Production.json");
+    builder.Configuration.AddJsonStream(jsonStream);
+}
+
 // Load API URL from config
-// TODO: For production, replace with S3-hosted file
 var apiUrl = builder.Configuration["ApiBaseUrl"];
 
 // Register services
