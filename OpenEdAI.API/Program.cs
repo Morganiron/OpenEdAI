@@ -51,12 +51,16 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     }
 });
 
-// CORS policy for local development
+// CORS policy
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontendDev", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5239", "https://localhost:7043")
+        policy.WithOrigins(
+            "http://localhost:5239",            // Local DEV HTTP
+            "https://localhost:7043",           // Local DEV HTTPS
+            "https://openedai.morganiron.com"   // Production
+            )
         .AllowAnyHeader()
         .AllowAnyMethod();
     });
@@ -239,11 +243,13 @@ LinkVet.Initialize(loggerFactory);
 app.UseHttpsRedirection();
 
 // Enable CORS
-app.UseCors("AllowFrontendDev");
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+// Simple endpoint for health checks from ALB
+app.MapGet("/health", () => Results.Ok("Healthy")).AllowAnonymous();
 
 app.Run();
