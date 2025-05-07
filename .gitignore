@@ -384,9 +384,6 @@ wwwroot/css/bootstrap.min.css
 wwwroot/css/open-iconic-bootstrap.min.css
 wwwroot/css/site.css
 
-# Docker-related files
-.dockerignore
-Dockerfile
 docker-compose.yml
 *.patch
 /structure.txt

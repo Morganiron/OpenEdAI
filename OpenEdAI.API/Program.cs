@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Amazon.CognitoIdentityProvider;
 using Amazon.Extensions.NETCore.Setup;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols;
@@ -62,8 +63,17 @@ builder.Services.AddCors(options =>
             "https://openedai.morganiron.com"   // Production
             )
         .AllowAnyHeader()
-        .AllowAnyMethod();
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
+});
+
+// Logging forwarded headers
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // Load and bind the config objects
@@ -157,7 +167,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKeys = signingKeys,
             NameClaimType = "username",
             RoleClaimType = "cognito:groups"
-
         };
 
         options.Events = new JwtBearerEvents
@@ -166,7 +175,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 // Retrieve the client_id from the token and compare it with expected value
                 var tokenClientId = context.Principal.FindFirst("client_id")?.Value;
-
                 if (string.IsNullOrWhiteSpace(tokenClientId) || tokenClientId.Trim() != cognito.AppClientId.Trim())
                 {
                     context.Fail("Invalid client_id.");
@@ -174,10 +182,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 return Task.CompletedTask;
             }
         };
-
     });
 
-// Logging for model binding failures
+// Model binding logging
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
@@ -204,25 +211,20 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
-// Add application services
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
-
-// Add authorization service
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (args.Contains("--migrate-only"))
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var strategy = context.Database.CreateExecutionStrategy();
 
     await strategy.ExecuteAsync(async () =>
     {
         var pending = await context.Database.GetPendingMigrationsAsync();
-
         if (pending.Any())
         {
             Console.WriteLine($"Pending migrations: {string.Join(", ", pending)}");
@@ -233,23 +235,19 @@ if (args.Contains("--migrate-only"))
             Console.WriteLine("No pending migrations.");
         }
     });
-    return; // skip app.Run()
 }
 
-// Inject logger factory into LinkVet
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 LinkVet.Initialize(loggerFactory);
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
-
-// Enable CORS
+app.UseRouting();
 app.UseCors("AllowFrontend");
-
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-// Simple endpoint for health checks from ALB
-app.MapGet("/health", () => Results.Ok("Healthy")).AllowAnonymous();
+app.MapGet("/health", () => Results.Ok("Healthy")).AllowAnonymous().ShortCircuit();
 
 app.Run();

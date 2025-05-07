@@ -9,16 +9,12 @@
 
   <ItemGroup>
     <Compile Remove="Configurations\**" />
-    <Compile Remove="Middleware\**" />
     <Compile Remove="Repositories\**" />
     <Content Remove="Configurations\**" />
-    <Content Remove="Middleware\**" />
     <Content Remove="Repositories\**" />
     <EmbeddedResource Remove="Configurations\**" />
-    <EmbeddedResource Remove="Middleware\**" />
     <EmbeddedResource Remove="Repositories\**" />
     <None Remove="Configurations\**" />
-    <None Remove="Middleware\**" />
     <None Remove="Repositories\**" />
   </ItemGroup>
 
