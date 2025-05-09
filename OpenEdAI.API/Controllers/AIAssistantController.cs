@@ -402,32 +402,62 @@ namespace OpenEdAI.API.Controllers
                         token
                     );
 
-                    // Execute each lesson's queries
-                    for (int i = 0; i < searchPlans.Count; i++)
+                    // Limit concurrent tasks to prevent overwhelming external services
+                    int maxConcurrentTasks = 3; // Conservative limit
+                    using var semaphore = new SemaphoreSlim(maxConcurrentTasks);
+
+                    // Execute lesson queries with controlled parallelism
+                    var lessonTasks = new List<Task<Lesson>>();
+
+                    foreach (var item in searchPlans.Select((sp, i) => new { SearchPlan = sp, Index = i }))
                     {
-                        var sp = searchPlans[i];
-                        var originalLesson = plan.Lessons[i];
+                        var sp = item.SearchPlan;
+                        var i = item.Index;
 
+                        // Create a task that respects the semaphore
+                        var task = Task.Run(async () =>
+                        {
+                            await semaphore.WaitAsync(token);
+                            try
+                            {
+                                var originalLesson = plan.Lessons[i];
+                                _logger.LogInformation("Processing lesson {LessonIndex}: {LessonTitle}", i, originalLesson.Title);
 
-                        var contentLinks = await contentSearchSvc
-                        .SearchContentLinksAsync(
-                            userInput,
-                            plan,
-                            sp,
-                            studentProfile,
-                            token
-                        );
+                                var contentLinks = await contentSearchSvc
+                                    .SearchContentLinksAsync(
+                                        userInput,
+                                        plan,
+                                        sp,
+                                        studentProfile,
+                                        token
+                                    );
 
-                        var lesson = new Lesson(
-                            originalLesson.Title,
-                            originalLesson.Description,
-                            contentLinks,
-                            originalLesson.Tags,
-                            courseID: 0
-                            );
+                                return new Lesson(
+                                    originalLesson.Title,
+                                    originalLesson.Description,
+                                    contentLinks,
+                                    originalLesson.Tags,
+                                    courseID: 0
+                                );
+                            }
+                            finally
+                            {
+                                semaphore.Release();
+                            }
+                        });
 
+                        lessonTasks.Add(task);
+                    }
+
+                    // Wait for all lesson tasks to complete
+                    var lessons = await Task.WhenAll(lessonTasks);
+
+                    // Add all lessons to the course
+                    foreach (var lesson in lessons)
+                    {
                         courseToSave.Lessons.Add(lesson);
                     }
+
                     // Save the course and lessons to the database
                     scopedContext.Courses.Add(courseToSave);
                     await scopedContext.SaveChangesAsync(token);
