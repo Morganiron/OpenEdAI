@@ -1,29 +1,70 @@
-<strong>**DO NOT DISTRIBUTE OR PUBLICLY POST SOLUTIONS TO THESE LABS. MAKE ALL FORKS OF THIS REPOSITORY WITH SOLUTION CODE PRIVATE. PLEASE REFER TO THE STUDENT CODE OF CONDUCT AND ETHICAL EXPECTATIONS FOR COLLEGE OF INFORMATION TECHNOLOGY STUDENTS FOR SPECIFICS. **</strong>
+# OpenEdAI – AI-Powered Personalized Learning Platform
 
-# WESTERN GOVERNORS UNIVERSITY 
-## D424 – SOFTWARE ENGINEERING CAPSTONE
-Welcome to Software Engineering Capstone! This is an opportunity for students to develop full stack software engineering documentation and applications. They will execute documentation, unit testing, revision of software applications, and deploy software applications with scripts and containers on a cloud platform.
+OpenEdAI is a full-stack educational platform that dynamically generates personalized learning paths from free, trusted online resources using AI.  
+Built for accessibility and scalability, OpenEdAI enables learners to define their goals and receive customized course plans tailored to their educational background and learning needs.
 
-FOR SPECIFIC TASK INSTRUCTIONS AND REQUIREMENTS FOR THIS ASSESSMENT, PLEASE REFER TO THE COURSE PAGE.
-BASIC INSTRUCTIONS
-For this assessment, you will deploy your developed full stack software product to a web service of your choice.
+Originally developed as a Software Engineering Capstone Project at WGU, the platform now enters long-term development with active deployment on AWS.
 
+## Table of Contents
 
-## SUPPLEMENTAL RESOURCES  
-1.	How to clone a project to IntelliJ using Git?
+* [Live Application](#live-application)
+* [Key Features](#key-features)
+* [Architecture Overview](#architecture-overview)
+* [Planned Enhancements](#planned-enhancements)
+* [Contributing](#contributing)
+* [License](#license)
 
-> Ensure that you have Git installed on your system and that IntelliJ is installed using [Toolbox](https://www.jetbrains.com/toolbox-app/). Make sure that you are using version 2022.3.2. Once this has been confirmed, click the clone button and use the 'IntelliJ IDEA (HTTPS)' button. This will open IntelliJ with a prompt to clone the proejct. Save it in a safe location for the directory and press clone. IntelliJ will prompt you for your credentials. Enter in your WGU Credentials and the project will be cloned onto your local machine.  
+## Live Application
 
-2. How to create a branch and start Development?
+Frontend: [https://openedai.morganiron.com](https://openedai.morganiron.com)  
+Authentication: Managed via AWS Cognito Hosted UI
 
-- GitLab method
-> Press the '+' button located near your branch name. In the dropdown list, press the 'New branch' button. This will allow you to create a name for your branch. Once the branch has been named, you can select 'Create Branch' to push the branch to your repository.
+## Key Features
 
-- IntelliJ method
-> In IntelliJ, Go to the 'Git' button on the top toolbar. Select the new branch option and create a name for the branch. Make sure checkout branch is selected and press create. You can now add a commit message and push the new branch to the local repo.
+* **AI-Generated Learning Plans** – OpenAI builds custom course structures based on topic, experience level, and user profile
+* **Dynamic Resource Linking** – Relevant YouTube and article content is fetched, vetted, and assigned to each lesson
+* **Progress Tracking** – Interactive dashboards visualize lesson and course completion
+* **Student Profiles** – Users provide education level, preferred formats, and special considerations to shape course recommendations
+* **Secure Auth** – Cognito-based JWT authentication with session refresh and auto-login
+* **Asynchronous Processing** – Background task queue handles long-running link generation processes
 
-## SUPPORT
-If you need additional support, please navigate to the course page and reach out to your course instructor.
+## Architecture Overview
 
-## FUTURE USE
-Take this opportunity to create or add to a simple resume portfolio to highlight and showcase your work for future use in career search, experience, and education!
+| Layer       		| Stack/Services                                                      |
+| ----------- 		| ------------------------------------------------------------------- |
+| Frontend    		| Blazor WebAssembly (.NET 9), Deployed to AWS S3 + CloudFront        |
+| Backend     		| ASP.NET Core Web API (.NET 9), Dockerized + Deployed on ECS Fargate |
+| Database    		| Amazon Aurora (MySQL 8.x)                                           |
+| Auth        		| AWS Cognito (Hosted UI + OAuth2 Flow, JWT-based Authorization)      |
+| Secrets     		| AWS Secrets Manager in production, .NET User Secrets in development |
+| AI Services		| OpenAI API (GPT-4o Mini), Google Custom Search, YouTube Data API    |
+| Infrastructure	| AWS: ECS, RDS, S3, CloudFront, ALB, ACM, Route 53                   |
+
+## Planned Enhancements
+
+* CI/CD Pipeline – GitHub Actions for ECS (API) and S3 (WASM)
+* Quizzes + Assessments – Optional knowledge checks per lesson
+* Achievements – Badges for completed courses and progress
+* Usage Monitoring – CloudWatch metrics and autoscaling triggers
+* Public Course Sharing – Share links to AI-generated courses
+
+## Contributing
+
+Currently in single-developer maintenance mode. Pull requests are welcome with prior discussion. To contribute:
+
+* Fork the repository
+* Use a working branch: feature/your-feature
+* Follow C# clean architecture best practices and commit with:
+
+```
+type(scope): description
+```
+
+## License
+
+This project is licensed under the [Creative Commons BY-NC-ND 4.0 License](https://creativecommons.org/licenses/by-nc-nd/4.0/).  
+It is intended **solely for educational and demonstration purposes**.
+
+**Commercial use, redistribution, or modification of this codebase is strictly prohibited without explicit written permission from the author.**
+
+© Robert Morgan – Morganiron
