@@ -1,0 +1,37 @@
+OpenEdAI Personal Use License v1.0  
+Copyright (c) 2025 Robert Morgan
+
+1. Purpose  
+This license governs the use of the OpenEdAI software project ("the Software") and its source code, including all accompanying files, documentation, and assets, as maintained by Robert Morgan ("the Author").
+
+2. Grant of Limited Rights  
+Subject to full compliance with the terms of this license, permission is hereby granted to any individual or organization ("the User") to:  
+- View, execute, and interact with the Software for personal, non-commercial, and educational purposes only.
+
+3. Restrictions  
+The User may NOT:  
+- Copy, reproduce, republish, upload, post, transmit, or distribute the source code or any derivative works thereof.  
+- Modify, adapt, translate, reverse-engineer, decompile, disassemble, or create derivative works based on the Software.  
+- Use the Software, in whole or in part, for commercial purposes.  
+- Redistribute or host the Software, including forks, mirrors, or clones, in any public or private repository.  
+- Submit contributions to the Software without the express written consent of the Author.
+
+4. Contributions  
+Only Users who have received prior written authorization from the Author may submit code, documentation, or other contributions to the Software. All accepted contributions shall become the intellectual property of the Author.
+
+5. Revocation of License  
+Any breach of this license will result in immediate termination of all rights granted herein. The Author reserves the right to revoke this license at any time and for any reason.
+
+6. No Open Source  
+This Software is not licensed under any Open Source Initiative (OSI)-approved license. It is proprietary software provided under strict usage terms and does not meet the criteria for open-source software.
+
+7. No Warranty  
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE AUTHOR SHALL NOT BE HELD LIABLE FOR ANY DAMAGES ARISING IN CONNECTION WITH THE USE OF THE SOFTWARE.
+
+8. API Use and Third-Party Terms  
+The Software integrates with external APIs and services including but not limited to OpenAI, Amazon Web Services (AWS), and Google APIs. The User is solely responsible for complying with the terms of use, privacy policies, and licensing requirements of all such third-party services. Use of the Software does not grant any rights or licenses to those services. Misuse of API keys or unauthorized use of the services may result in legal consequences under those providers’ terms.
+
+---
+
+For inquiries, permissions, or licensing discussions, contact:  
+Robert Morgan – rmor760@wgu.edu
