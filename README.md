@@ -1,5 +1,10 @@
 # OpenEdAI – AI-Powered Personalized Learning Platform
 
+![License](https://img.shields.io/badge/license-Custom-blue)
+![Platform](https://img.shields.io/badge/platform-Blazor%20WASM%20%7C%20.NET%209-blueviolet)
+![Hosted On](https://img.shields.io/badge/Hosted%20on-AWS-orange)
+![Auth](https://img.shields.io/badge/Auth-AWS%20Cognito-lightgrey)
+
 OpenEdAI is a full-stack educational platform that dynamically generates personalized learning paths from free, trusted online resources using AI.  
 Built for accessibility and scalability, OpenEdAI enables learners to define their goals and receive customized course plans tailored to their educational background and learning needs.
 
