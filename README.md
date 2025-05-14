@@ -50,21 +50,27 @@ Authentication: Managed via AWS Cognito Hosted UI
 
 ## Contributing
 
-Currently in single-developer maintenance mode. Pull requests are welcome with prior discussion. To contribute:
+Currently in single-developer maintenance mode. Contributions are not currently accepted unless explicitly authorized by the repository owner.
 
-* Fork the repository
-* Use a working branch: feature/your-feature
-* Follow C# clean architecture best practices and commit with:
+If granted permission:
 
-```
-type(scope): description
-```
+* Use a working branch: `feature/your-feature`
+* Follow C# clean architecture best practices
+* Use conventional commits:
+
+  ```
+  type(scope): description
+  ```
 
 ## License
 
-This project is licensed under the [Creative Commons BY-NC-ND 4.0 License](https://creativecommons.org/licenses/by-nc-nd/4.0/).  
-It is intended **solely for educational and demonstration purposes**.
+This project is licensed under a **Custom Personal Use License**.
 
-**Commercial use, redistribution, or modification of this codebase is strictly prohibited without explicit written permission from the author.**
+The codebase may only be used for **personal, non-commercial, and educational purposes**.
+**Redistribution, commercial use, or modification is strictly prohibited** without prior written consent from the author.
 
-© Robert Morgan – Morganiron
+This software is **not open source** and does not grant any of the permissions typically associated with OSI-approved licenses.
+
+See the [LICENSE](./LICENSE) file for the full terms.
+
+© 2025 Robert Morgan – All rights reserved.
