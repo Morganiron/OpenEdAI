@@ -5,20 +5,22 @@
 ![Hosted On](https://img.shields.io/badge/Hosted%20on-AWS-orange)
 ![Auth](https://img.shields.io/badge/Auth-AWS%20Cognito-lightgrey)  
 
+OpenEdAI is a full-stack educational platform that dynamically generates personalized learning paths from free, trusted online resources using AI.  
+Built for accessibility and scalability, OpenEdAI enables learners to define their goals and receive customized course plans tailored to their educational background and learning needs.
 
+Originally developed as a Software Engineering Capstone Project at WGU, the platform now enters long-term development with active deployment on AWS. 
 
+## ☕ Support This Project
+
+If you'd like to support the development and maintenance of OpenEdAI, you can donate via Streamlabs:
+
+👉 [https://streamlabs.com/morganiron1/tip](https://streamlabs.com/morganiron1/tip)
+
+Every bit helps keep the infrastructure and APIs running!  
 **Current Estimated Operating Costs**  
 ![AWS Cost](https://img.shields.io/badge/AWS%20Monthly~$20-blue)
 ![OpenAI Cost](https://img.shields.io/badge/OpenAI%20Monthly~$0.11-purple)
 ![Google API Cost](https://img.shields.io/badge/Google%20API~Free%20(Tier)-green)  
-
-
-OpenEdAI is a full-stack educational platform that dynamically generates personalized learning paths from free, trusted online resources using AI.  
-Built for accessibility and scalability, OpenEdAI enables learners to define their goals and receive customized course plans tailored to their educational background and learning needs.
-
-Originally developed as a Software Engineering Capstone Project at WGU, the platform now enters long-term development with active deployment on AWS.  
-
-
 
 ## Table of Contents
 
@@ -32,8 +34,7 @@ Originally developed as a Software Engineering Capstone Project at WGU, the plat
 
 ## Live Application
 
-Frontend: [https://openedai.morganiron.com](https://openedai.morganiron.com)  
-Authentication: Managed via AWS Cognito Hosted UI
+[https://openedai.morganiron.com](https://openedai.morganiron.com)  
 
 ## Key Features
 
