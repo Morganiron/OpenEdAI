@@ -3,12 +3,22 @@
 ![License](https://img.shields.io/badge/license-Custom-blue)
 ![Platform](https://img.shields.io/badge/platform-Blazor%20WASM%20%7C%20.NET%209-blueviolet)
 ![Hosted On](https://img.shields.io/badge/Hosted%20on-AWS-orange)
-![Auth](https://img.shields.io/badge/Auth-AWS%20Cognito-lightgrey)
+![Auth](https://img.shields.io/badge/Auth-AWS%20Cognito-lightgrey)  
+
+
+
+**Current Estimated Operating Costs**  
+![AWS Cost](https://img.shields.io/badge/AWS%20Monthly~$20-blue)
+![OpenAI Cost](https://img.shields.io/badge/OpenAI%20Monthly~$0.11-purple)
+![Google API Cost](https://img.shields.io/badge/Google%20API~Free%20(Tier)-green)  
+
 
 OpenEdAI is a full-stack educational platform that dynamically generates personalized learning paths from free, trusted online resources using AI.  
 Built for accessibility and scalability, OpenEdAI enables learners to define their goals and receive customized course plans tailored to their educational background and learning needs.
 
-Originally developed as a Software Engineering Capstone Project at WGU, the platform now enters long-term development with active deployment on AWS.
+Originally developed as a Software Engineering Capstone Project at WGU, the platform now enters long-term development with active deployment on AWS.  
+
+
 
 ## Table of Contents
 
@@ -16,6 +26,7 @@ Originally developed as a Software Engineering Capstone Project at WGU, the plat
 * [Key Features](#key-features)
 * [Architecture Overview](#architecture-overview)
 * [Planned Enhancements](#planned-enhancements)
+* [Operating Cost Breakdown](#estimated-operating-costs)
 * [Contributing](#contributing)
 * [License](#license)
 
@@ -52,6 +63,25 @@ Authentication: Managed via AWS Cognito Hosted UI
 * Achievements – Badges for completed courses and progress
 * Usage Monitoring – CloudWatch metrics and autoscaling triggers
 * Public Course Sharing – Share links to AI-generated courses
+
+## Estimated Operating Costs
+
+OpenEdAI is actively hosted and incurs monthly infrastructure and API usage costs. These are covered by the developer during ongoing development.
+
+| Category             | Service                          | Current Cost (USD) |
+|----------------------|-----------------------------------|--------------------|
+| **Hosting**          | AWS ECS (Fargate, containers)     | $9.44              |
+|                      | AWS RDS (Aurora MySQL)            | $4.64              |
+|                      | AWS Load Balancer (ALB)           | $4.32              |
+|                      | AWS VPC, Networking               | $1.20              |
+|                      | EC2 - Other                       | $0.61              |
+| **AI Services**      | OpenAI API (GPT-4o Mini)          | $0.11              |
+| **Search APIs**      | Google Custom Search (820 queries)| $0.00 (Free Tier)  |
+|                      | YouTube Data API                  | $0.00 (Quota-based)|
+|                      |                                   |                    |
+| **Estimated Total**  | *(as of May 2025)*                | **~$20.32**        |
+
+> 💡 These estimates reflect current low-traffic usage during active development. As public usage increases, so may costs (especially OpenAI and Google Search APIs which charge per request).
 
 ## Contributing
 
