@@ -18,7 +18,7 @@ If you'd like to support the development and maintenance of OpenEdAI, you can do
 
 Every bit helps keep the infrastructure and APIs running!  
 **Current Estimated Operating Costs**  
-![AWS Cost](https://img.shields.io/badge/AWS%20Monthly~$20-blue)
+![AWS Cost](https://img.shields.io/badge/AWS%20Monthly~$37-blue)
 ![OpenAI Cost](https://img.shields.io/badge/OpenAI%20Monthly~$0.11-purple)
 ![Google API Cost](https://img.shields.io/badge/Google%20API~Free%20(Tier)-green)  
 
@@ -28,6 +28,7 @@ Every bit helps keep the infrastructure and APIs running!
 * [Key Features](#key-features)
 * [Architecture Overview](#architecture-overview)
 * [Planned Enhancements](#planned-enhancements)
+* [Future Plans / Roadmap](#roadmap)
 * [Operating Cost Breakdown](#estimated-operating-costs)
 * [Contributing](#contributing)
 * [License](#license)
@@ -47,15 +48,15 @@ Every bit helps keep the infrastructure and APIs running!
 
 ## Architecture Overview
 
-| Layer       		| Stack/Services                                                      |
-| ----------- 		| ------------------------------------------------------------------- |
-| Frontend    		| Blazor WebAssembly (.NET 9), Deployed to AWS S3 + CloudFront        |
-| Backend     		| ASP.NET Core Web API (.NET 9), Dockerized + Deployed on ECS Fargate |
-| Database    		| Amazon Aurora (MySQL 8.x)                                           |
-| Auth        		| AWS Cognito (Hosted UI + OAuth2 Flow, JWT-based Authorization)      |
-| Secrets     		| AWS Secrets Manager in production, .NET User Secrets in development |
-| AI Services		| OpenAI API (GPT-4o Mini), Google Custom Search, YouTube Data API    |
-| Infrastructure	| AWS: ECS, RDS, S3, CloudFront, ALB, ACM, Route 53                   |
+| Layer        | Stack/Services |
+| ----------- | ------------------------------------------------------------------- |
+| Frontend | Blazor WebAssembly (.NET 9), Deployed to AWS S3 + CloudFront |
+| Backend | ASP.NET Core Web API (.NET 9), Dockerized + Deployed on ECS Fargate |
+| Database | Amazon Aurora (MySQL 8.x) |
+| Auth | AWS Cognito (Hosted UI + OAuth2 Flow, JWT-based Authorization) |
+| Secrets | AWS Secrets Manager in production, .NET User Secrets in development |
+| AI Services | OpenAI API (GPT-4o Mini), Google Custom Search, YouTube Data API |
+| Infrastructure | AWS: ECS, RDS, S3, CloudFront, ALB, ACM, Route 53 |
 
 ## Planned Enhancements
 
@@ -65,24 +66,41 @@ Every bit helps keep the infrastructure and APIs running!
 * Usage Monitoring – CloudWatch metrics and autoscaling triggers
 * Public Course Sharing – Share links to AI-generated courses
 
+<a id="roadmap"></a>
+## Future Plans / Roadmap 🚧
+
+* **Rate-limiting** – Evaluate *per-user course credits* vs *N courses per day*. Surface remaining quota in the UI.
+* **Reusable Lesson Store** – Persist generated lessons with a stable hash so identical lessons can be reused across courses and users.
+* **Learner Feedback** – “Report link” & “Rate lesson” buttons; aggregate feedback into a `link_quality` score.
+* **Hierarchical Course Model** – `Program → Course → Chapter → Lesson` DTOs, EF migrations, and collapsible UI outline.
+* **Scope Auto‑Detection** – AI decides whether to generate a full program, a course, or a single lesson based on topic breadth.
+* **Project Tracking** – Convert each bullet into a GitHub Issue (label `future-plan`) and add to a Projects board.
+
 ## Estimated Operating Costs
 
 OpenEdAI is actively hosted and incurs monthly infrastructure and API usage costs. These are covered by the developer during ongoing development.
 
-| Category             | Service                          | Current Cost (USD) |
-|----------------------|-----------------------------------|--------------------|
-| **Hosting**          | AWS ECS (Fargate, containers)     | $9.44              |
-|                      | AWS RDS (Aurora MySQL)            | $4.64              |
-|                      | AWS Load Balancer (ALB)           | $4.32              |
-|                      | AWS VPC, Networking               | $1.20              |
-|                      | EC2 - Other                       | $0.61              |
-| **AI Services**      | OpenAI API (GPT-4o Mini)          | $0.11              |
-| **Search APIs**      | Google Custom Search (820 queries)| $0.00 (Free Tier)  |
-|                      | YouTube Data API                  | $0.00 (Quota-based)|
-|                      |                                   |                    |
-| **Estimated Total**  | *(as of May 2025)*                | **~$20.32**        |
+| Category | Service | Current Cost (USD) |
+|----------------------|--------------------------------------------|--------------------|
+| **Hosting** | AWS ECS (Elastic Container Service) | $12.55 |
+| | AWS RDS (Relational Database Service) | $9.45 |
+| | AWS Load Balancer (ALB) | $9.99 |
+| | AWS VPC & Networking | $3.77 |
+| | EC2 – Other | $1.44 |
+| | Secrets Manager | $0.02 |
+| | ECR (Container Registry) | $0.01 |
+| | S3 | $0.00 |
+| | Route 53 | $0.00 |
+| | CloudFront | $0.00 |
+| | Cognito | $0.00 |
+| | CloudWatch | $0.00 |
+| **AI Services** | OpenAI API (GPT‑4o Mini) | $0.11 |
+| **Search APIs** | Google Custom Search | $0.00 (Free Tier) |
+| | YouTube Data API | $0.00 (Quota‑based) |
+| | | |
+| **Estimated Total** | *(as of May 2025)* | **~$37.23** |
 
-> 💡 These estimates reflect current low-traffic usage during active development. As public usage increases, so may costs (especially OpenAI and Google Search APIs which charge per request).
+> 💡 These estimates reflect current low‑traffic usage during active development. As public usage increases, so may costs (especially OpenAI and Google Search APIs which charge per request).
 
 ## Contributing
 
