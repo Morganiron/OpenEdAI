@@ -4,9 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using FuzzySharp;
-using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OpenEdAI.Configuration;
 
 namespace OpenEdAI.Services.ContentFiltering
 {
@@ -22,17 +23,25 @@ namespace OpenEdAI.Services.ContentFiltering
         private readonly YouTubeService _youTube;
         private readonly ILogger<YouTubeHeuristics> _logger;
 
-        /// <summary>Minimum accepted duration (inclusive).</summary>
-        private static readonly TimeSpan MinDuration = TimeSpan.FromMinutes(3);
-        /// <summary>Maximum accepted duration (inclusive).</summary>
-        private static readonly TimeSpan MaxDuration = TimeSpan.FromMinutes(30);
-        /// <summary>Fuzzy‑match score threshold (0‑100).</summary>
-        private const int FuzzThreshold = 70;
+        // Values come from appsettings (YouTubeHeuristics section)
+        private readonly TimeSpan _minDuration;
+        private readonly TimeSpan _maxDuration;
+        private readonly int _fuzzThreshold;
+        private readonly bool _requireCaptions;
 
-        public YouTubeHeuristics(YouTubeService youTube, ILogger<YouTubeHeuristics> logger)
+        public YouTubeHeuristics(
+            YouTubeService youTube,
+            IOptions<YouTubeHeuristicsSettings> options,
+            ILogger<YouTubeHeuristics> logger)
         {
             _youTube = youTube ?? throw new ArgumentNullException(nameof(youTube));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            var cfg = options?.Value ?? throw new ArgumentNullException(nameof(options));
+            _minDuration = TimeSpan.FromMinutes(Math.Max(1, cfg.MinDurationMinutes));
+            _maxDuration = TimeSpan.FromMinutes(Math.Max(cfg.MinDurationMinutes, cfg.MaxDurationMinutes));
+            _fuzzThreshold = Math.Clamp(cfg.FuzzyThreshold, 0, 100);
+            _requireCaptions = cfg.RequireCaptions;
         }
 
         /// <summary>
@@ -66,14 +75,14 @@ namespace OpenEdAI.Services.ContentFiltering
                 _logger.LogInformation("Unable to parse duration for video {Id}", id);
                 return false;
             }
-            if (dur < MinDuration || dur > MaxDuration)
+            if (dur < _minDuration || dur > _maxDuration)
             {
-                _logger.LogInformation("Rejected video {Id} – duration {Dur} outside [{Min}, {Max}]", id, dur, MinDuration, MaxDuration);
+                _logger.LogInformation("Rejected video {Id} – duration {Dur} outside [{Min}, {Max}]", id, dur, _minDuration, _maxDuration);
                 return false;
             }
 
             // 2) Captions available -------------------------------------------------------
-            if (!string.Equals(vid.ContentDetails.Caption, "true", StringComparison.OrdinalIgnoreCase))
+            if (_requireCaptions && !string.Equals(vid.ContentDetails.Caption, "true", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Rejected video {Id} – no captions", id);
                 return false;
@@ -84,9 +93,9 @@ namespace OpenEdAI.Services.ContentFiltering
                 .Append(vid.Snippet.Title).Append(' ').Append(vid.Snippet.Description)
                 .ToString();
             int score = Fuzz.TokenSetRatio(lessonTopic, text);
-            if (score < FuzzThreshold)
+            if (score < _fuzzThreshold)
             {
-                _logger.LogInformation("Rejected video {Id} – fuzzy score {Score} < {Threshold}", id, score, FuzzThreshold);
+                _logger.LogInformation("Rejected video {Id} – fuzzy score {Score} < {Threshold}", id, score, _fuzzThreshold);
                 return false;
             }
 

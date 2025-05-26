@@ -14,6 +14,7 @@ using OpenAI;
 using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
+using OpenEdAI.Configuration;
 using OpenEdAI.Services.ContentFiltering;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -234,6 +235,10 @@ builder.Services.AddSingleton(sp =>
         ApplicationName = "OpenEdAI"
     });
 });
+
+builder.Services.Configure<YouTubeHeuristicsSettings>(
+    builder.Configuration.GetSection("YouTubeHeuristics"));
+
 builder.Services.AddSingleton<IYouTubeHeuristics, YouTubeHeuristics>();
 
 builder.Services.AddAuthorization();
@@ -263,7 +268,7 @@ using (var scope = app.Services.CreateScope())
 // ---------- Initialise LinkVet with newly-registered helpers
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
 var relevanceChecker = app.Services.GetRequiredService<ContentRelevanceChecker>();
-var ytHeuristics = app.Services.GetRequiredService<YouTubeHeuristics>();
+var ytHeuristics = app.Services.GetRequiredService<IYouTubeHeuristics>();
 
 LinkVet.Initialize(loggerFactory, relevanceChecker, ytHeuristics);
 

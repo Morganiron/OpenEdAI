@@ -1,10 +1,14 @@
-﻿namespace OpenEdAI.API.Configuration
+﻿using OpenEdAI.Configuration;
+using OpenEdAI.Services.ContentFiltering;
+
+namespace OpenEdAI.API.Configuration
 {
     public class AppSettings
     {
         public AWSSettings AWS { get; set; }
         public OpenAISettings OpenAI { get; set; }
         public GoogleAPISettings GoogleAPIs { get; set; }
+        public YouTubeHeuristicsSettings YouTubeHeuristics { get; set; }
     }
 
     public class AWSSettings
