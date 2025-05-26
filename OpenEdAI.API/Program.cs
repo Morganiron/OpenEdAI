@@ -12,6 +12,7 @@ using OpenAI;
 using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
+using OpenEdAI.Services.ContentFiltering;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -213,6 +214,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<ContentRelevanceChecker>();
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -238,7 +240,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
-LinkVet.Initialize(loggerFactory);
+LinkVet.Initialize(loggerFactory, app.Services.GetRequiredService<ContentRelevanceChecker>());
 
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();

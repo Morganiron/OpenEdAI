@@ -1,24 +1,29 @@
 ﻿using Google.Apis.CustomSearchAPI.v1;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
-using OpenEdAI.API.DTOs;
-using OpenEdAI.API.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
+using OpenEdAI.API.Configuration;
+using OpenEdAI.API.DTOs;
+using System.Net.Http;
 
 namespace OpenEdAI.API.Services
 {
-    public class AIDrivenContentSearchService : IContentSearchService
+    /// <summary>
+    /// Performs Google / YouTube searches and filters raw links through <see cref="LinkVet"/>.
+    /// </summary>
+    public sealed class AIDrivenContentSearchService : IContentSearchService
     {
-        private readonly AIDrivenSearchPlanService _planSvc;
         private readonly YouTubeService _youTube;
         private readonly CustomSearchAPIService _customSearch;
         private readonly string _cseId;
         private readonly ILogger<AIDrivenContentSearchService> _logger;
 
-        public AIDrivenContentSearchService(AIDrivenSearchPlanService planSvc, IOptions<AppSettings> settings, ILogger<AIDrivenContentSearchService> logger)
+        public AIDrivenContentSearchService(
+            AIDrivenSearchPlanService _ /* kept for DI compatibility */,
+            IOptions<AppSettings> settings,
+            ILogger<AIDrivenContentSearchService> logger)
         {
-            _planSvc = planSvc;
             _logger = logger;
 
             var apiKey = settings.Value.GoogleAPIs.ApiKey
@@ -40,98 +45,89 @@ namespace OpenEdAI.API.Services
             });
         }
 
-        // Generates an AI-driven search plan for the given course input and student profile
-        public async Task<List<string>> SearchContentLinksAsync(CoursePersonalizationInput userInput, CoursePlanDTO coursePlan, LessonSearchPlanDTO searchPlan, StudentProfileDTO profile, CancellationToken token)
+        /// <inheritdoc />
+        public async Task<List<string>> SearchContentLinksAsync(
+            CoursePersonalizationInput userInput,
+            CoursePlanDTO coursePlan,
+            LessonSearchPlanDTO searchPlan,
+            StudentProfileDTO profile,
+            CancellationToken token)
         {
             var rawLinks = new List<string>();
 
-            // Execute each query the AI generated
+            // 1. Execute each AI-generated query -----------------------------------------
             foreach (var q in searchPlan.Queries)
             {
-                // If the query is for YouTube, search YouTube
                 if (q.Provider.Equals("YouTube", StringComparison.OrdinalIgnoreCase))
                 {
-                    var searchRequest = _youTube.Search.List("snippet");
-                    searchRequest.Q = q.Query;
-                    searchRequest.Type = "video";
-                    searchRequest.MaxResults = q.MaxResults;
+                    var ytReq = _youTube.Search.List("snippet");
+                    ytReq.Q = q.Query;
+                    ytReq.Type = "video";
+                    ytReq.MaxResults = q.MaxResults;
 
-                    var searchResponse = await searchRequest.ExecuteAsync(token);
-                    rawLinks.AddRange(searchResponse.Items.Select(item => $"https://youtu.be/{item.Id.VideoId}"));
+                    var ytResp = await ytReq.ExecuteAsync(token);
+                    rawLinks.AddRange(
+                        ytResp.Items.Select(item => $"https://youtu.be/{item.Id.VideoId}"));
                 }
-                // If the query is for Custom Search, search Custom Search
                 else if (q.Provider.Equals("CustomSearch", StringComparison.OrdinalIgnoreCase))
                 {
-                    var searchRequest = _customSearch.Cse.List();
-                    searchRequest.Cx = _cseId;
+                    var csReq = _customSearch.Cse.List();
+                    csReq.Cx = _cseId;
 
-                    // Build the "exclude" portion into the query
-                    var exclude = q.ExcludedSites != null && q.ExcludedSites.Any()
-                        ? " " + string.Join(" ", q.ExcludedSites.Select(site => site))
-                        : "";
+                    // Build "-site:" exclusions into the query string
+                    var exclude = (q.ExcludedSites?.Any() == true)
+                        ? " " + string.Join(' ', q.ExcludedSites)
+                        : string.Empty;
 
-                    // Concatenate the query with the exclude portion
-                    searchRequest.Q = $"{q.Query}{exclude}";
-                    searchRequest.Num = q.MaxResults;
+                    csReq.Q = q.Query + exclude;
+                    csReq.Num = q.MaxResults;
 
-                    var searchResponse = await searchRequest.ExecuteAsync(token);
-                    rawLinks.AddRange(searchResponse.Items.Select(item => item.Link));
+                    var csResp = await csReq.ExecuteAsync(token);
+                    rawLinks.AddRange(csResp.Items.Select(item => item.Link));
                 }
             }
 
-            // Vet, deduplicate, and limit the links
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(8)
-            };
-
-            var byType = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            // 2. Vet + deduplicate --------------------------------------------------------
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var bucket = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var url in rawLinks.Where(u => Uri.IsWellFormedUriString(u, UriKind.Absolute)))
             {
-                // Skip obvious "search result" redirect pages
+                // Skip obvious redirects to other search pages
                 if (url.Contains("/search", StringComparison.OrdinalIgnoreCase))
-                {
                     continue;
-                }
 
-                // Normalize: videos vs everything-else
-                var type = url.Contains("youtu", StringComparison.OrdinalIgnoreCase)
+                var contentType = url.Contains("youtu", StringComparison.OrdinalIgnoreCase)
                     ? "Video"
-                    : "Article";
+                    : "Article"; // treat non-YouTube as Article for now
 
-                // Try to vet the URL, if it fails, skip it
                 try
                 {
-                    // Use the link vetting service to check if the URL is acceptable for the given type
-                    if (!await LinkVet.IsAcceptableAsync(url, type, httpClient, token))
-                    {
-                        _logger.LogDebug("Link vetting failed for {Url}", url);
-                        continue;
-                    }
+                    var ok = await LinkVet.IsAcceptableAsync(
+                        url,
+                        contentType,
+                        lessonTopic: searchPlan.LessonTitle,
+                        http: httpClient,
+                        ct: token);
+
+                    if (!ok) continue;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Exception vetting link {Url}", url);
+                    _logger.LogWarning(ex, "Link vetting threw for {Url}", url);
                     continue;
                 }
-                
 
+                // Keep ≤2 links per type
+                if (!bucket.TryGetValue(contentType, out var list))
+                    bucket[contentType] = list = new(2);
 
-                // Keep at most 2 links of each type
-                if (!byType.TryGetValue(type, out var list))
-                {
-                    byType[type] = list = new(2);
-                }
-
-                // Add the URL if we don't have 2 of this type already
                 if (list.Count < 2)
-                {
                     list.Add(url);
-                }
             }
-            // Flatten to a single list while preserving insertion order
-            return byType.Values.SelectMany(x => x).Distinct().ToList();
+
+            // 3. Flatten while preserving order ------------------------------------------
+            return bucket.Values.SelectMany(x => x).Distinct().ToList();
         }
     }
 }
