@@ -14,6 +14,7 @@ using OpenAI;
 using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
+using OpenEdAI.Configuration;
 using OpenEdAI.Services.ContentFiltering;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -234,6 +235,10 @@ builder.Services.AddSingleton(sp =>
         ApplicationName = "OpenEdAI"
     });
 });
+
+builder.Services.Configure<YouTubeHeuristicsSettings>(
+    builder.Configuration.GetSection("YouTubeHeuristics"));
+
 builder.Services.AddSingleton<IYouTubeHeuristics, YouTubeHeuristics>();
 
 builder.Services.AddAuthorization();
