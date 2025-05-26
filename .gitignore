@@ -389,3 +389,6 @@ docker-compose.yml
 /structure.txt
 /project-structure.txt
 /OpenEdAI.API/project-structure.txt
+*.diff
+/OpenEdAI.API/Dockerfile
+/OpenEdAI.API/.dockerignore
