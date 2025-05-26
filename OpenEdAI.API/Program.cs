@@ -1,10 +1,12 @@
-using System.IdentityModel.Tokens.Jwt;
 using Amazon.CognitoIdentityProvider;
 using Amazon.Extensions.NETCore.Setup;
+using Google.Apis.Services;
+using Google.Apis.YouTube.v3;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -13,6 +15,7 @@ using OpenEdAI.API.Configuration;
 using OpenEdAI.API.Data;
 using OpenEdAI.API.Services;
 using OpenEdAI.Services.ContentFiltering;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -214,7 +217,25 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+
+// Content-filter helpers
 builder.Services.AddHttpClient<ContentRelevanceChecker>();
+
+// Google YouTube helpers
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = sp.GetRequiredService<IOptions<AppSettings>>().Value;
+    var apiKey = cfg.GoogleAPIs.ApiKey ??
+                 throw new InvalidOperationException("Missing GoogleApis.ApiKey");
+
+    return new YouTubeService(new BaseClientService.Initializer
+    {
+        ApiKey = apiKey,
+        ApplicationName = "OpenEdAI"
+    });
+});
+builder.Services.AddSingleton<IYouTubeHeuristics, YouTubeHeuristics>();
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -239,8 +260,12 @@ using (var scope = app.Services.CreateScope())
     });
 }
 
+// ---------- Initialise LinkVet with newly-registered helpers
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
-LinkVet.Initialize(loggerFactory, app.Services.GetRequiredService<ContentRelevanceChecker>());
+var relevanceChecker = app.Services.GetRequiredService<ContentRelevanceChecker>();
+var ytHeuristics = app.Services.GetRequiredService<YouTubeHeuristics>();
+
+LinkVet.Initialize(loggerFactory, relevanceChecker, ytHeuristics);
 
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();

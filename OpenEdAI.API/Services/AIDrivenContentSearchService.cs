@@ -55,62 +55,45 @@ namespace OpenEdAI.API.Services
         {
             var rawLinks = new List<string>();
 
-            // 1. Execute each AI-generated query -----------------------------------------
+            // --- execute YouTube / CustomSearch queries -----------------------------
             foreach (var q in searchPlan.Queries)
             {
                 if (q.Provider.Equals("YouTube", StringComparison.OrdinalIgnoreCase))
                 {
-                    var ytReq = _youTube.Search.List("snippet");
-                    ytReq.Q = q.Query;
-                    ytReq.Type = "video";
-                    ytReq.MaxResults = q.MaxResults;
-
-                    var ytResp = await ytReq.ExecuteAsync(token);
-                    rawLinks.AddRange(
-                        ytResp.Items.Select(item => $"https://youtu.be/{item.Id.VideoId}"));
+                    var yt = _youTube.Search.List("snippet");
+                    yt.Q = q.Query;
+                    yt.Type = "video";
+                    yt.MaxResults = q.MaxResults;
+                    rawLinks.AddRange((await yt.ExecuteAsync(token))
+                                      .Items.Select(i => $"https://youtu.be/{i.Id.VideoId}"));
                 }
                 else if (q.Provider.Equals("CustomSearch", StringComparison.OrdinalIgnoreCase))
                 {
-                    var csReq = _customSearch.Cse.List();
-                    csReq.Cx = _cseId;
-
-                    // Build "-site:" exclusions into the query string
-                    var exclude = (q.ExcludedSites?.Any() == true)
-                        ? " " + string.Join(' ', q.ExcludedSites)
-                        : string.Empty;
-
-                    csReq.Q = q.Query + exclude;
-                    csReq.Num = q.MaxResults;
-
-                    var csResp = await csReq.ExecuteAsync(token);
-                    rawLinks.AddRange(csResp.Items.Select(item => item.Link));
+                    var cs = _customSearch.Cse.List();
+                    cs.Cx = _cseId;
+                    cs.Q = q.Query + (q.ExcludedSites?.Any() == true
+                                        ? " " + string.Join(' ', q.ExcludedSites)
+                                        : "");
+                    cs.Num = q.MaxResults;
+                    rawLinks.AddRange((await cs.ExecuteAsync(token)).Items.Select(i => i.Link));
                 }
             }
 
-            // 2. Vet + deduplicate --------------------------------------------------------
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            // --- vet / dedupe --------------------------------------------------------
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
             var bucket = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var url in rawLinks.Where(u => Uri.IsWellFormedUriString(u, UriKind.Absolute)))
             {
-                // Skip obvious redirects to other search pages
-                if (url.Contains("/search", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (url.Contains("/search", StringComparison.OrdinalIgnoreCase)) continue;
 
-                var contentType = url.Contains("youtu", StringComparison.OrdinalIgnoreCase)
-                    ? "Video"
-                    : "Article"; // treat non-YouTube as Article for now
+                var ctype = url.Contains("youtu", StringComparison.OrdinalIgnoreCase) ? "Video" : "Article";
 
                 try
                 {
-                    var ok = await LinkVet.IsAcceptableAsync(
-                        url,
-                        contentType,
-                        lessonTopic: searchPlan.LessonTitle,
-                        http: httpClient,
-                        ct: token);
-
-                    if (!ok) continue;
+                    if (!await LinkVet.IsAcceptableAsync(
+                            url, ctype, searchPlan.LessonTitle, http, token))
+                        continue;
                 }
                 catch (Exception ex)
                 {
@@ -118,15 +101,12 @@ namespace OpenEdAI.API.Services
                     continue;
                 }
 
-                // Keep ≤2 links per type
-                if (!bucket.TryGetValue(contentType, out var list))
-                    bucket[contentType] = list = new(2);
+                if (!bucket.TryGetValue(ctype, out var list))
+                    bucket[ctype] = list = new(2);
 
-                if (list.Count < 2)
-                    list.Add(url);
+                if (list.Count < 2) list.Add(url);
             }
 
-            // 3. Flatten while preserving order ------------------------------------------
             return bucket.Values.SelectMany(x => x).Distinct().ToList();
         }
     }

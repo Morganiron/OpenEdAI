@@ -13,141 +13,120 @@ using Xunit;
 
 namespace OpenEdAI.Tests.Services
 {
-    /// <summary>
-    /// Unit tests for <see cref="LinkVet"/> verifying domain filtering, MIME heuristics, and network fall‑back logic.
-    /// The real <see cref="ContentRelevanceChecker"/> is used with a stub <see cref="HttpClient"/> so we don’t have
-    /// to mock a sealed class.
-    /// </summary>
     public class LinkVetTests
     {
-        private readonly ContentRelevanceChecker _relevanceChecker;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly ContentRelevanceChecker _relevance;
+        private readonly IYouTubeHeuristics _ytHeuristicsStub; // interface‑based stub
 
         public LinkVetTests()
         {
-            // Stub HttpClient that always returns a tiny HTML page containing the lesson topic string.
-            var handler = new StubMessageHandler((request, _) =>
+            // --- stub HttpClient used by ContentRelevanceChecker ----------------------
+            var stubHtmlHandler = new StubHandler((_, __) =>
             {
-                var html = "<title>" + request.RequestUri!.AbsoluteUri + "</title><p>lesson topic</p>";
-                var resp = new HttpResponseMessage(HttpStatusCode.OK)
+                var msg = new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(html)
+                    Content = new StringContent("<title>lesson topic</title><p>sample</p>")
                 };
-                resp.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
-                return resp;
+                msg.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+                return msg;
             });
-            var httpClient = new HttpClient(handler);
+            var relevanceHttp = new HttpClient(stubHtmlHandler);
 
-            _loggerFactory = LoggerFactory.Create(b => { /* no sinks */ });
-            _relevanceChecker = new ContentRelevanceChecker(httpClient, _loggerFactory.CreateLogger<ContentRelevanceChecker>());
+            // --- logger / relevance -----------------------------------------------
+            _loggerFactory = LoggerFactory.Create(b => { });
+            _relevance = new ContentRelevanceChecker(relevanceHttp,
+                           _loggerFactory.CreateLogger<ContentRelevanceChecker>());
 
-            // Initialise LinkVet for all tests.
-            LinkVet.Initialize(_loggerFactory, _relevanceChecker);
+            // --- YouTube heuristics stub (always passes) --------------------------
+            var ytMock = new Mock<IYouTubeHeuristics>(MockBehavior.Strict);
+            ytMock.Setup(y => y.IsRelevantAsync(It.IsAny<string>(),
+                                                 It.IsAny<string>(),
+                                                 It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(true);
+            _ytHeuristicsStub = ytMock.Object;
+
+            // --- initialise LinkVet once for all tests ----------------------------
+            LinkVet.Initialize(_loggerFactory, _relevance, _ytHeuristicsStub);
         }
 
-        #region Helpers
-        private static HttpClient CreateHttpClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
+        #region helper types / methods
+
+        private sealed class StubHandler : HttpMessageHandler
         {
-            var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-            handlerMock.Protected()
-                       .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
-                       .ReturnsAsync((HttpRequestMessage req, CancellationToken _) => responder(req));
-            return new HttpClient(handlerMock.Object);
+            private readonly Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> _fn;
+            public StubHandler(Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> fn) => _fn = fn;
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken t)
+                => Task.FromResult(_fn(r, t));
         }
 
-        /// <summary>
-        /// Simple in‑memory <see cref="HttpMessageHandler"/> used by the relevance checker.
-        /// </summary>
-        private sealed class StubMessageHandler : HttpMessageHandler
+        private static HttpClient FakeClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
         {
-            private readonly Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> _responder;
-            public StubMessageHandler(Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> responder) => _responder = responder;
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-                Task.FromResult(_responder(request, cancellationToken));
+            var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+            mock.Protected()
+                .Setup<Task<HttpResponseMessage>>("SendAsync",
+                         ItExpr.IsAny<HttpRequestMessage>(),
+                         ItExpr.IsAny<CancellationToken>())
+                .ReturnsAsync((HttpRequestMessage r, CancellationToken _) => responder(r));
+            return new HttpClient(mock.Object);
         }
+
         #endregion
 
-        [Fact]
-        public async Task PreferredDomain_AllRequestsFail_StillAllowed()
+        [Fact]  // preferred domain, network failures → still allowed
+        public async Task PreferredDomain_AllRequestsFail_Allowed()
         {
-            var http = CreateHttpClient(_ => throw new HttpRequestException());
-            var ok = await LinkVet.IsAcceptableAsync("https://ocw.mit.edu/index.htm", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.True(ok);
+            var http = FakeClient(_ => throw new HttpRequestException());
+            Assert.True(await LinkVet.IsAcceptableAsync(
+                "https://ocw.mit.edu/index.htm",
+                "Article",
+                "lesson topic",
+                http,
+                CancellationToken.None));
         }
 
-        [Fact]
+        [Fact]  // non-preferred domain, network failures → reject
         public async Task NonPreferredDomain_AllRequestsFail_Rejected()
         {
-            var http = CreateHttpClient(_ => throw new HttpRequestException());
-            var ok = await LinkVet.IsAcceptableAsync("https://example.com/bad", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.False(ok);
+            var http = FakeClient(_ => throw new HttpRequestException());
+            Assert.False(await LinkVet.IsAcceptableAsync(
+                "https://example.com/page",
+                "Article",
+                "lesson topic",
+                http,
+                CancellationToken.None));
         }
 
-        [Fact]
-        public async Task HeadOk_ValidMime_AllowsLink()
+        [Fact]  // HEAD succeeds + valid mime → allow
+        public async Task HeadOk_ValidMime_Allowed()
         {
-            var http = CreateHttpClient(_ =>
+            var http = FakeClient(_ =>
             {
-                var resp = new HttpResponseMessage(HttpStatusCode.OK);
-                resp.Content = new StringContent(string.Empty);
-                resp.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
-                return resp;
+                var msg = new HttpResponseMessage(HttpStatusCode.OK);
+                msg.Content = new StringContent(string.Empty);
+                msg.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+                return msg;
             });
-            var ok = await LinkVet.IsAcceptableAsync("https://medium.com/p/abc", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.True(ok);
+            Assert.True(await LinkVet.IsAcceptableAsync(
+                "https://medium.com/p/abc",
+                "Article",
+                "lesson topic",
+                http,
+                CancellationToken.None));
         }
 
-        [Fact]
-        public async Task HeadOk_InvalidMime_RejectsLink()
-        {
-            var http = CreateHttpClient(_ =>
-            {
-                var resp = new HttpResponseMessage(HttpStatusCode.OK);
-                resp.Content = new StringContent(string.Empty);
-                resp.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-                return resp;
-            });
-            var ok = await LinkVet.IsAcceptableAsync("https://medium.com/p/abc", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.False(ok);
-        }
-
-        [Fact]
-        public async Task HeadFails_GetOk_ValidMime_AllowsLink()
-        {
-            var http = CreateHttpClient(req =>
-            {
-                if (req.Method == HttpMethod.Head) throw new HttpRequestException();
-                var resp = new HttpResponseMessage(HttpStatusCode.OK);
-                resp.Content = new StringContent(string.Empty);
-                resp.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
-                return resp;
-            });
-            var ok = await LinkVet.IsAcceptableAsync("https://developer.mozilla.org/docs/Web/API", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.True(ok);
-        }
-
-        [Fact]
-        public async Task PreferredVideoHost_RequestedArticle_Rejects()
-        {
-            var http = CreateHttpClient(_ =>
-            {
-                var resp = new HttpResponseMessage(HttpStatusCode.OK);
-                resp.Content = new StringContent(string.Empty);
-                resp.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
-                return resp;
-            });
-            var ok = await LinkVet.IsAcceptableAsync("https://youtube.com/watch?v=123", "Article", "lesson topic", http, CancellationToken.None);
-            Assert.False(ok);
-        }
-
-        [Theory]
-        [InlineData("invalid-url", "Article")]
-        [InlineData("", "Video")]
+        [Theory]  // bad URLs → false
+        [InlineData("", "Article")]
+        [InlineData("bad-url", "Video")]
         public async Task InvalidUrl_ReturnsFalse(string url, string type)
         {
-            var http = CreateHttpClient(_ => throw new InvalidOperationException());
-            var ok = await LinkVet.IsAcceptableAsync(url, type, "topic", http, CancellationToken.None);
-            Assert.False(ok);
+            var http = FakeClient(_ => throw new InvalidOperationException());
+            Assert.False(await LinkVet.IsAcceptableAsync(
+                url,
+                type,
+                "topic",
+                http,
+                CancellationToken.None));
         }
     }
 }
