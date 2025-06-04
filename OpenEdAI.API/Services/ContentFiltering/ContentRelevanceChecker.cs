@@ -3,31 +3,20 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using FuzzySharp;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
-using FuzzySharp;
 
 namespace OpenEdAI.Services.ContentFiltering
 {
-    /// <summary>
-    /// Fetches HTML snippets and evaluates their relevance to a lesson topic using fuzzy matching.
-    /// </summary>
     public sealed class ContentRelevanceChecker
     {
         private readonly HttpClient _http;
         private readonly ILogger<ContentRelevanceChecker> _logger;
 
-        // Maximum number of bytes to read from the response stream
-        private const int SnippetSize = 32 * 1024; // 32 KB
+        private const int SnippetSize = 32 * 1024;      // 32 KB
+        private const int RelevanceThreshold = 60;      // 0–100 fuzzy score
 
-        // Minimum fuzzy-match score (0-100) considered relevant
-        private const int RelevanceThreshold = 70;
-
-        /// <summary>
-        /// Initializes a new instance of <see cref="ContentRelevanceChecker"/>.
-        /// </summary>
-        /// <param name="http">HttpClient for fetching content.</param>
-        /// <param name="logger">Logger for diagnostic messages.</param>
         public ContentRelevanceChecker(HttpClient http, ILogger<ContentRelevanceChecker> logger)
         {
             _http = http ?? throw new ArgumentNullException(nameof(http));
@@ -35,67 +24,84 @@ namespace OpenEdAI.Services.ContentFiltering
         }
 
         /// <summary>
-        /// Fetches the first <see cref="SnippetSize"/> bytes of HTML from the specified URL.
+        /// For YouTube (or other video) results: no HTTP GET is performed.
+        /// We simply fuzzy-match the video’s Snippet.Title + Snippet.Description
+        /// against the lessonTopic.  Returns true if score ≥ threshold.
         /// </summary>
-        /// <param name="url">The URL of the page to fetch.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <returns>Snippet of HTML or null if failed.</returns>
-        public async Task<string?> FetchSnippetAsync(string url, CancellationToken ct)
+        public bool IsYouTubeSnippetRelevant(
+            string snippetTitle,
+            string snippetDescription,
+            string lessonTopic)
         {
-            try
-            {
-                using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("Failed to fetch snippet, HTTP {Status} for URL {Url}", response.StatusCode, url);
-                    return null;
-                }
+            var sb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(snippetTitle))
+                sb.AppendLine(snippetTitle.Trim());
+            if (!string.IsNullOrWhiteSpace(snippetDescription))
+                sb.AppendLine(snippetDescription.Trim());
 
-                using var stream = await response.Content.ReadAsStreamAsync(ct);
-                var buffer = new byte[SnippetSize];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
-                return Encoding.UTF8.GetString(buffer, 0, read);
-            }
-            catch (Exception ex)
+            var combined = sb.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(combined))
             {
-                _logger.LogWarning(ex, "Exception fetching snippet from URL {Url}", url);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Determines if the page at <paramref name="url"/> is relevant to <paramref name="lessonTopic"/>.
-        /// </summary>
-        /// <param name="url">Page URL.</param>
-        /// <param name="lessonTopic">Lesson topic to compare against.</param>
-        /// <param name="ct">Cancellation token.</param>
-        /// <returns>True if relevance score meets threshold; otherwise false.</returns>
-        public async Task<bool> IsRelevantAsync(string url, string lessonTopic, CancellationToken ct)
-        {
-            var snippet = await FetchSnippetAsync(url, ct);
-            if (string.IsNullOrWhiteSpace(snippet))
-            {
-                _logger.LogInformation("Empty or missing snippet for URL {Url}", url);
+                _logger.LogInformation("Empty YouTube snippet for lessonTopic='{Topic}'", lessonTopic);
                 return false;
             }
 
-            // Extract key text elements from the snippet
-            var text = ExtractText(snippet);
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                _logger.LogInformation("No extractable text for URL {Url}", url);
-                return false;
-            }
-
-            // Compute fuzzy-match score
-            int score = Fuzz.TokenSetRatio(lessonTopic, text);
-            _logger.LogInformation("Relevance score {Score} for URL {Url}", score, url);
+            int score = Fuzz.TokenSetRatio(lessonTopic, combined);
+            _logger.LogInformation("YouTube snippet relevance score={Score} for lessonTopic='{Topic}\nwith snippet:\n{Combined}'", score, lessonTopic, combined);
 
             return score >= RelevanceThreshold;
         }
 
         /// <summary>
-        /// Parses HTML to extract title, meta description, first H1 and P.
+        /// For non-YouTube URLs (Article or Forum): fetch up to SnippetSize bytes of HTML,
+        /// extract <title>, <meta name='description'>, first <h1> and first <p>, then fuzzy-match.
+        /// </summary>
+        public async Task<bool> IsHtmlSnippetRelevantAsync(
+            string url,
+            string lessonTopic,
+            CancellationToken ct)
+        {
+            string? htmlSnippet;
+            try
+            {
+                using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to GET HTML (status {Status}) for URL={Url}", response.StatusCode, url);
+                    return false;
+                }
+
+                using var stream = await response.Content.ReadAsStreamAsync(ct);
+                var buffer = new byte[SnippetSize];
+                int read = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+                htmlSnippet = Encoding.UTF8.GetString(buffer, 0, read);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception fetching HTML snippet for URL={Url}", url);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(htmlSnippet))
+            {
+                _logger.LogInformation("Empty HTML snippet for URL={Url}", url);
+                return false;
+            }
+
+            var extractedText = ExtractText(htmlSnippet);
+            if (string.IsNullOrWhiteSpace(extractedText))
+            {
+                _logger.LogInformation("No extractable text for URL={Url}", url);
+                return false;
+            }
+
+            int score = Fuzz.TokenSetRatio(lessonTopic, extractedText);
+            _logger.LogInformation("HTML snippet relevance score={Score} for URL={Url}\nwith extracted text:\n{extractedText}", score, url, extractedText);
+            return score >= RelevanceThreshold;
+        }
+
+        /// <summary>
+        /// Extracts text from <title>, <meta name='description'>, first <h1>, first <p> in the HTML.
         /// </summary>
         private static string ExtractText(string html)
         {
@@ -103,23 +109,25 @@ namespace OpenEdAI.Services.ContentFiltering
             doc.LoadHtml(html);
             var sb = new StringBuilder();
 
-            // Title tag
-            var title = doc.DocumentNode.SelectSingleNode("//title")?.InnerText;
-            if (!string.IsNullOrWhiteSpace(title)) sb.AppendLine(title);
+            var titleNode = doc.DocumentNode.SelectSingleNode("//title");
+            if (titleNode != null && !string.IsNullOrWhiteSpace(titleNode.InnerText))
+                sb.AppendLine(titleNode.InnerText.Trim());
 
-            // Meta description
-            var meta = doc.DocumentNode.SelectSingleNode("//meta[@name='description']")?.GetAttributeValue("content", null);
-            if (!string.IsNullOrWhiteSpace(meta)) sb.AppendLine(meta);
+            var metaDesc = doc.DocumentNode
+                              .SelectSingleNode("//meta[@name='description']")?
+                              .GetAttributeValue("content", null);
+            if (!string.IsNullOrWhiteSpace(metaDesc))
+                sb.AppendLine(metaDesc.Trim());
 
-            // First heading
-            var h1 = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText;
-            if (!string.IsNullOrWhiteSpace(h1)) sb.AppendLine(h1);
+            var h1Node = doc.DocumentNode.SelectSingleNode("//h1");
+            if (h1Node != null && !string.IsNullOrWhiteSpace(h1Node.InnerText))
+                sb.AppendLine(h1Node.InnerText.Trim());
 
-            // First paragraph
-            var p = doc.DocumentNode.SelectSingleNode("//p")?.InnerText;
-            if (!string.IsNullOrWhiteSpace(p)) sb.AppendLine(p);
+            var pNode = doc.DocumentNode.SelectSingleNode("//p");
+            if (pNode != null && !string.IsNullOrWhiteSpace(pNode.InnerText))
+                sb.AppendLine(pNode.InnerText.Trim());
 
-            return sb.ToString();
+            return sb.ToString().Trim();
         }
     }
 }

@@ -16,8 +16,6 @@
         {
             [ContentType.Video] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "youtube.com",
-                "youtu.be",
                 "vimeo.com",
                 "dailymotion.com",
                 "coursera.org",
@@ -76,29 +74,33 @@
         // Main entry: returns true if a URL is allowed based on host and path heuristics
         public bool IsAllowed(string url, ContentType type)
         {
-            if (string.IsNullOrWhiteSpace(url)) return false;
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
 
-            // Validate and parse the URL
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 return false;
 
-            string host = uri.Host.ToLowerInvariant();
-            string path = uri.AbsolutePath.ToLowerInvariant() + uri.Query.ToLowerInvariant();
+            var host = uri.Host.ToLowerInvariant();
+            var pathAndQuery = (uri.AbsolutePath + uri.Query).ToLowerInvariant();
 
-            // Block known disallowed domains
+            // 1) REJECT if it hits a global deny domain or deny-path keyword
             if (GlobalDenyList.Contains(host))
                 return false;
 
-            // Block URLs containing blacklisted path fragments
-            if (DenyPathKeywords.Any(fragment => path.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            if (DenyPathKeywords.Any(fragment => pathAndQuery.Contains(fragment)))
                 return false;
 
-            // Allow if host is explicitly trusted
-            if (AllowLists.TryGetValue(type, out var allowedDomains) && allowedDomains.Contains(host))
-                return true;
+            // 2) Otherwise, everything else is allowed. (Don’t treat AllowLists as “only allow these hosts.”)
+            return true;
+        }
 
-            // Fallback: allow subdomain match against trusted base domains
-            return allowedDomains?.Any(allowed => host == allowed || host.EndsWith('.' + allowed)) == true;
+        /// <summary>
+        /// Returns the raw allow‐list of hosts for a given ContentType.
+        /// </summary>
+        public IReadOnlyCollection<string> GetAllowedHosts(ContentType type)
+        {
+            // Note: we return the underlying HashSet as readonly
+            return AllowLists[type];
         }
     }
 }

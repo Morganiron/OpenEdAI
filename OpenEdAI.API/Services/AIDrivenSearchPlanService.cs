@@ -138,17 +138,21 @@ namespace OpenEdAI.API.Services
         // Convert loose string to SearchQueryDTO
         private static void AddLooseString(string raw, ICollection<SearchQueryDTO> list)
         {
-            var isCustom = raw.Contains("-site:");
-            var provider = isCustom ? "CustomSearch" : "YouTube";
-            var parts = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var excludes = parts.Where(p => p.StartsWith("-site:")).ToList();
-            var queryText = string.Join(' ', parts.Where(p => !p.StartsWith("-site:")));
+            var lower = raw.ToLowerInvariant();
+            bool looksLikeYouTube = lower.Contains("youtu.be") || lower.Contains("youtube.com");
+
+            var provider = looksLikeYouTube
+                           ? "YouTube"
+                           : "CustomSearch";
+
+            // Everything else is “the entire raw text” as the search query:
+            var queryText = raw.Trim();
+
             list.Add(new SearchQueryDTO
             {
                 Provider = provider,
                 Query = queryText,
-                ExcludedSites = excludes,
-                MaxResults = 2
+                MaxResults = 5
             });
         }
 
@@ -181,25 +185,25 @@ namespace OpenEdAI.API.Services
             if (prefs.Contains("Video tutorials"))
             {
                 // 2 YouTube slots
-                slots.Add("{ \"Provider\": \"YouTube\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
-                slots.Add("{ \"Provider\": \"YouTube\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
+                slots.Add("{ \"Provider\": \"YouTube\", \"Query\": string }");
+                slots.Add("{ \"Provider\": \"YouTube\", \"Query\": string }");
                 // 2 CustomSearch video slots
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
             }
 
             if (prefs.Contains("Articles"))
             {
                 // 2 Article slots
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
             }
 
             if (prefs.Contains("Discussion forums"))
             {
                 // 2 Forum slots
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
-                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string, \"ExcludedSites\": [string], \"MaxResults\": 2 }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
+                slots.Add("{ \"Provider\": \"CustomSearch\", \"Query\": string }");
             }
 
             // Emit them with commas
@@ -213,7 +217,6 @@ namespace OpenEdAI.API.Services
             sb.AppendLine("}");
             sb.AppendLine("]");
 
-            // 3) Rest of your guidance unchanged
             sb.AppendLine("### Additional Guidance");
             sb.AppendLine("0. Adjust query complexity and phrasing to match a student at the " + profile.EducationLevel + " level" +
                           (!string.IsNullOrWhiteSpace(profile.SpecialConsiderations)
@@ -225,17 +228,16 @@ namespace OpenEdAI.API.Services
             sb.AppendLine("   * \"{LessonTitle} tutorial for {EducationLevel}\"");
             sb.AppendLine("   * \"{LessonTitle} videos for people with {SpecialConsiderations}\"");
             sb.AppendLine("   * \"Intro to {LessonTitle} for {ExperienceLevel}\"");
-            sb.AppendLine("4. Avoid returning PDFs or research-heavy papers unless explicitly relevant.");
-            sb.AppendLine("5. Ensure result diversity but maintain relevance.");
-            sb.AppendLine("6. IMPORTANT: Use each Lesson's Tags array to provide better context for that lesson's search queries.");
-            sb.AppendLine("7. **For each lesson**, generate exactly **two** queries of each requested content type:");
+            sb.AppendLine("4. Ensure result diversity but maintain relevance.");
+            sb.AppendLine("5. IMPORTANT: Use each Lesson's Tags array to provide better context for that lesson's search queries.");
+            sb.AppendLine("6. **For each lesson**, generate exactly **two** queries of each requested content type:");
             // Dynamically add the instructions for the preferred content types
             if (prefs.Contains("Video tutorials"))
-                sb.AppendLine("   - **Video tutorials:** 2 × YouTube + 2 × CustomSearch video (filetype:mp4 OR \"watch?v=\" OR vimeo.com)");
+                sb.AppendLine("   - **Video tutorials:** 2 × YouTube + 2 × CustomSearch video");
             if (prefs.Contains("Articles"))
-                sb.AppendLine("   - **Articles:** 2 × CustomSearch article (with exclusions -site:youtube.com -site:vimeo.com -site:dailymotion.com -site:facebook.com -site:.social)");
+                sb.AppendLine("   - **Articles:** 2 × CustomSearch article");
             if (prefs.Contains("Discussion forums"))
-                sb.AppendLine("   - **Discussion forums:** 2 × CustomSearch forum (same exclusions as Articles)");
+                sb.AppendLine("   - **Discussion forums:** 2 × CustomSearch forum");
 
             sb.AppendLine();
 

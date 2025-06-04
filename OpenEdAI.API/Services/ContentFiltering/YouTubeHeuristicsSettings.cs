@@ -13,7 +13,7 @@ public sealed class YouTubeHeuristicsSettings
     public int MaxDurationMinutes { get; set; } = 30;
 
     /// <summary>Fuzzy-match threshold (0-100). Default = 70.</summary>
-    public int FuzzyThreshold { get; set; } = 70;
+    public int FuzzyThreshold { get; set; } = 60;
 
     /// <summary>
     /// If <see langword="true"/>, videos without captions are rejected.  

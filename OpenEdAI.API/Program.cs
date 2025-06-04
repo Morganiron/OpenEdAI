@@ -1,5 +1,6 @@
 using Amazon.CognitoIdentityProvider;
 using Amazon.Extensions.NETCore.Setup;
+using Google.Apis.CustomSearchAPI.v1;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -222,7 +223,21 @@ builder.Services.AddHttpClient();
 // Content-filter helpers
 builder.Services.AddHttpClient<ContentRelevanceChecker>();
 
-// Google YouTube helpers
+// Google Custom Search helper
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = sp.GetRequiredService<IOptions<AppSettings>>().Value;
+    var apiKey = cfg.GoogleAPIs.ApiKey
+                 ?? throw new InvalidOperationException("Missing GoogleApis.ApiKey");
+
+    return new CustomSearchAPIService(new BaseClientService.Initializer
+    {
+        ApiKey = apiKey,
+        ApplicationName = "OpenEdAI"
+    });
+});
+
+// Google YouTube helper
 builder.Services.AddSingleton(sp =>
 {
     var cfg = sp.GetRequiredService<IOptions<AppSettings>>().Value;
@@ -267,10 +282,9 @@ using (var scope = app.Services.CreateScope())
 
 // ---------- Initialise LinkVet with newly-registered helpers
 var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
-var relevanceChecker = app.Services.GetRequiredService<ContentRelevanceChecker>();
 var ytHeuristics = app.Services.GetRequiredService<IYouTubeHeuristics>();
 
-LinkVet.Initialize(loggerFactory, relevanceChecker, ytHeuristics);
+LinkVet.Initialize(loggerFactory, ytHeuristics);
 
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
