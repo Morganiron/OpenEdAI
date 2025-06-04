@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenEdAI.API.Configuration;         // for AppSettings, etc.
 using OpenEdAI.API.DTOs;                  // for LessonSearchPlanDTO, SearchQueryDTO
-using OpenEdAI.Services.ContentFiltering; // for ContentRelevanceChecker, LinkVet
+using OpenEdAI.Services.ContentFiltering; // for ContentRelevanceChecker, LinkVet, IYouTubeHeuristics
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +22,7 @@ namespace OpenEdAI.API.Services
         private readonly CustomSearchAPIService _customSearch;
         private readonly string _cseId;
         private readonly ContentRelevanceChecker _contentRelevanceChecker;
+        private readonly IYouTubeHeuristics _ytHeuristics;
         private readonly ILogger<AIDrivenContentSearchService> _logger;
         private readonly HttpClient _httpClient;
 
@@ -30,27 +31,25 @@ namespace OpenEdAI.API.Services
             CustomSearchAPIService customSearch,
             IOptions<AppSettings> settings,
             ContentRelevanceChecker contentRelevanceChecker,
+            IYouTubeHeuristics ytHeuristics,
             ILogger<AIDrivenContentSearchService> logger,
             HttpClient httpClient)
         {
-            _youTube = youTube
-                ?? throw new ArgumentNullException(nameof(youTube));
-            _customSearch = customSearch
-                ?? throw new ArgumentNullException(nameof(customSearch));
+            _youTube = youTube ?? throw new ArgumentNullException(nameof(youTube));
+            _customSearch = customSearch ?? throw new ArgumentNullException(nameof(customSearch));
             _cseId = settings?.Value?.GoogleAPIs?.CustomSearchEngineId
-                ?? throw new InvalidOperationException("Missing GoogleAPIs:CustomSearchEngineId");
+                     ?? throw new InvalidOperationException("Missing GoogleAPIs:CustomSearchEngineId");
             _contentRelevanceChecker = contentRelevanceChecker
-                ?? throw new ArgumentNullException(nameof(contentRelevanceChecker));
-            _logger = logger
-                ?? throw new ArgumentNullException(nameof(logger));
-            _httpClient = httpClient
-                ?? throw new ArgumentNullException(nameof(httpClient));
+                                       ?? throw new ArgumentNullException(nameof(contentRelevanceChecker));
+            _ytHeuristics = ytHeuristics ?? throw new ArgumentNullException(nameof(ytHeuristics));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         }
 
         /// <inheritdoc />
         /// <remarks>
         ///  - For each `SearchQueryDTO q` in `searchPlan.Queries`:
-        ///     • If `q.Provider == "YouTube"`, run a YT search → snippet relevance → keep up to 2 videos.  
+        ///     • If `q.Provider == "YouTube"`, run a YT search → full YouTubeHeuristics check → keep up to 2 videos.  
         ///     • If `q.Provider == "CustomSearch"`, do a “siterestrict” search → LinkVet → HTML relevance → keep up to 2.  
         ///       If fewer than 2, do an unrestricted search → LinkVet → HTML relevance → fill up to 2.  
         ///  - After gathering all raw links, bucket them into Video/Forum/Article and call `DedupeAndLimit(...)`.  
@@ -85,7 +84,7 @@ namespace OpenEdAI.API.Services
                 if (string.Equals(q.Provider, "YouTube", StringComparison.OrdinalIgnoreCase))
                 {
                     // ───────────────────────────────────────────────────────────────────────────
-                    // 1) YOUTUBE BRANCH: do YT search, then only snippet relevance (no LinkVet).
+                    // 1) YOUTUBE BRANCH: run YT search → YouTubeHeuristics check → keep up to 2 videos.
                     // ───────────────────────────────────────────────────────────────────────────
                     var ytRequest = _youTube.Search.List("snippet");
                     ytRequest.Q = q.Query;
@@ -100,17 +99,22 @@ namespace OpenEdAI.API.Services
                         if (keptVideos >= 2)
                             break;
 
-                        var snippetTitle = item.Snippet.Title ?? "";
-                        var snippetDesc = item.Snippet.Description ?? "";
-
-                        // Use combinedContext instead of just lesson title
-                        bool isRelevant = _contentRelevanceChecker
-                            .IsYouTubeSnippetRelevant(snippetTitle, snippetDesc, combinedContext);
-
-                        if (!isRelevant)
+                        var videoId = item.Id.VideoId;
+                        if (string.IsNullOrWhiteSpace(videoId))
                             continue;
 
-                        string videoUrl = $"https://youtu.be/{item.Id.VideoId}";
+                        string videoUrl = $"https://youtu.be/{videoId}";
+
+                        // Only run through IYouTubeHeuristics for video vetting
+                        bool passesVideoHeuristics = await _ytHeuristics.IsRelevantAsync(
+                            videoUrlOrId: videoUrl,
+                            lessonTopic: combinedContext,
+                            ct: token
+                        );
+
+                        if (!passesVideoHeuristics)
+                            continue;
+
                         rawLinks.Add(videoUrl);
                         keptVideos++;
                     }
@@ -118,21 +122,16 @@ namespace OpenEdAI.API.Services
                 else if (string.Equals(q.Provider, "CustomSearch", StringComparison.OrdinalIgnoreCase))
                 {
                     // ───────────────────────────────────────────────────────────────────────────
-                    // 2) CUSTOMSEARCH BRANCH (allow-list first, then fallback to general)
-                    //
-                    //    (a) “Preferred-sites” pass → perform ONE “site:host1 OR site:host2 …” query
-                    //    (b) If < 2 links found, do one unrestricted search → vet → collect until 2
+                    // 2) CUSTOMSEARCH BRANCH: site‐restricted → LinkVet → HTML‐snippet relevance → keep up to 2
+                    //    If fewer than 2, fallback to unrestricted search → LinkVet → HTML‐snippet relevance → fill up to 2
                     // ───────────────────────────────────────────────────────────────────────────
 
-                    // 1) We assume all CustomSearch queries here are “Article”
                     var desiredType = ContentType.Article;
-
-                    // 2) Grab the allow-list of hosts from DomainFilter
                     var domainFilter = new DomainFilter();
                     var allowedHosts = domainFilter.GetAllowedHosts(desiredType);
 
-                    // 3) Build a single “site:…” clause that covers all allowedHosts
-                    //    e.g. "site:medium.com OR site:khanacademy.org OR site:freecodecamp.org"
+                    // Build a single “site:…” clause for all allowedHosts:
+                    // e.g. "site:medium.com OR site:khanacademy.org OR site:freecodecamp.org"
                     var siteClause = string.Join(" OR ",
                         allowedHosts.Select(h => $"site:{h}"));
 
@@ -157,14 +156,14 @@ namespace OpenEdAI.API.Services
                                 if (string.IsNullOrWhiteSpace(url))
                                     continue;
 
-                                // 4) Run LinkVet (re-check host/path heuristics)
+                                // 1) Run LinkVet (host/path heuristics, no YouTubeHeuristics here because this is CustomSearch)
                                 bool passesVet;
                                 try
                                 {
                                     passesVet = await LinkVet.IsAcceptableAsync(
                                         url: url,
-                                        requestedType: desiredType.ToString(), // “Article”
-                                        lessonTopic: combinedContext,            // use combinedContext
+                                        requestedType: desiredType.ToString(),
+                                        lessonTopic: combinedContext,
                                         http: _httpClient,
                                         ct: token
                                     );
@@ -177,10 +176,10 @@ namespace OpenEdAI.API.Services
                                 if (!passesVet)
                                     continue;
 
-                                // 5) Check fuzzy HTML snippet relevance using combinedContext
-                                bool isRelevant = await _contentRelevanceChecker
+                                // 2) Check fuzzy HTML snippet relevance using combinedContext
+                                bool isRelevantHtml = await _contentRelevanceChecker
                                     .IsHtmlSnippetRelevantAsync(url, combinedContext, token);
-                                if (!isRelevant)
+                                if (!isRelevantHtml)
                                     continue;
 
                                 vettedLinks.Add(url);
@@ -214,7 +213,7 @@ namespace OpenEdAI.API.Services
                                 passesVet = await LinkVet.IsAcceptableAsync(
                                     url: url,
                                     requestedType: desiredType.ToString(),
-                                    lessonTopic: combinedContext,            // use combinedContext
+                                    lessonTopic: combinedContext,
                                     http: _httpClient,
                                     ct: token
                                 );
@@ -226,9 +225,9 @@ namespace OpenEdAI.API.Services
                             if (!passesVet)
                                 continue;
 
-                            bool isRelevant = await _contentRelevanceChecker
+                            bool isRelevantHtml = await _contentRelevanceChecker
                                 .IsHtmlSnippetRelevantAsync(url, combinedContext, token);
-                            if (!isRelevant)
+                            if (!isRelevantHtml)
                                 continue;
 
                             vettedLinks.Add(url);
@@ -304,7 +303,7 @@ namespace OpenEdAI.API.Services
                 }
             }
 
-            // Merge in “Video first, then Articles, then Forums” (you can reorder if desired)
+            // Merge in “Video first, then Articles, then Forums”
             var result = new List<string>();
             result.AddRange(videos);
             result.AddRange(articles);

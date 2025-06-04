@@ -12,119 +12,122 @@ using OpenEdAI.Configuration;
 namespace OpenEdAI.Services.ContentFiltering
 {
     /// <summary>
-    /// Heuristics for determining whether a YouTube video is suitable for a lesson.
+    /// Central acceptance logic for YouTube videos:
+    ///   • duration window  
+    ///   • (optional) captions required  
+    ///   • fuzzy relevance of *title + description*  
     /// </summary>
-    /// <remarks>
-    /// * Checks duration, caption availability, and fuzzy relevance of title/description.
-    /// * Call once per candidate video link.
-    /// </remarks>
     public sealed class YouTubeHeuristics : IYouTubeHeuristics
     {
-        private readonly YouTubeService _youTube;
-        private readonly ILogger<YouTubeHeuristics> _logger;
+        private readonly YouTubeService _yt;
+        private readonly ILogger<YouTubeHeuristics> _log;
 
-        // Values come from appsettings (YouTubeHeuristics section)
-        private readonly TimeSpan _minDuration;
-        private readonly TimeSpan _maxDuration;
+        private readonly TimeSpan _minDur;
+        private readonly TimeSpan _maxDur;
         private readonly int _fuzzThreshold;
-        private readonly bool _requireCaptions;
+        private readonly bool _needCaptions;
 
         public YouTubeHeuristics(
-            YouTubeService youTube,
-            IOptions<YouTubeHeuristicsSettings> options,
-            ILogger<YouTubeHeuristics> logger)
+            YouTubeService yt,
+            IOptions<YouTubeHeuristicsSettings> cfg,
+            ILogger<YouTubeHeuristics> log)
         {
-            _youTube = youTube ?? throw new ArgumentNullException(nameof(youTube));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _yt = yt ?? throw new ArgumentNullException(nameof(yt));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            var cfg = options?.Value ?? throw new ArgumentNullException(nameof(options));
-            _minDuration = TimeSpan.FromMinutes(Math.Max(1, cfg.MinDurationMinutes));
-            _maxDuration = TimeSpan.FromMinutes(Math.Max(cfg.MinDurationMinutes, cfg.MaxDurationMinutes));
-            _fuzzThreshold = Math.Clamp(cfg.FuzzyThreshold, 0, 100);
-            _requireCaptions = cfg.RequireCaptions;
+            var s = cfg?.Value ?? throw new ArgumentNullException(nameof(cfg));
+            _minDur = TimeSpan.FromMinutes(Math.Max(1, s.MinDurationMinutes));
+            _maxDur = TimeSpan.FromMinutes(Math.Max(s.MinDurationMinutes, s.MaxDurationMinutes));
+            _fuzzThreshold = Math.Clamp(s.FuzzyThreshold, 0, 100);
+            _needCaptions = s.RequireCaptions;
         }
 
-        /// <summary>
-        /// Returns <c>true</c> if the YouTube video referenced by <paramref name="videoUrlOrId"/>
-        /// is relevant to <paramref name="lessonTopic"/> and meets duration/caption heuristics.
-        /// </summary>
-        public async Task<bool> IsRelevantAsync(string videoUrlOrId, string lessonTopic, CancellationToken ct)
+        public async Task<bool> IsRelevantAsync(
+            string videoUrlOrId,
+            string lessonTopic,
+            CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(videoUrlOrId)) return false;
-            var id = ExtractVideoId(videoUrlOrId);
-            if (id is null)
+            // 1) Extract the 11-character YouTube ID
+            var id = ExtractId(videoUrlOrId);
+            if (id == null)
             {
-                _logger.LogDebug("Could not extract YouTube ID from {Input}", videoUrlOrId);
+                _log.LogDebug("Could not extract YouTube ID from '{Input}'", videoUrlOrId);
                 return false;
             }
 
-            // Request snippet + contentDetails for the single video
-            var req = _youTube.Videos.List("snippet,contentDetails");
+            // 2) Fetch snippet + contentDetails
+            var req = _yt.Videos.List("snippet,contentDetails");
             req.Id = id;
             var resp = await req.ExecuteAsync(ct);
             if (resp.Items.Count == 0)
             {
-                _logger.LogInformation("Video {Id} not found via YouTube Data API", id);
-                return false;
-            }
-            var vid = resp.Items[0];
-
-            // 1) Duration window ----------------------------------------------------------
-            if (!TryParseIsoDuration(vid.ContentDetails.Duration, out var dur))
-            {
-                _logger.LogInformation("Unable to parse duration for video {Id}", id);
-                return false;
-            }
-            if (dur < _minDuration || dur > _maxDuration)
-            {
-                _logger.LogInformation("Rejected video {Id} – duration {Dur} outside [{Min}, {Max}]", id, dur, _minDuration, _maxDuration);
+                _log.LogInformation("Video '{Id}' not found via YouTube API", id);
                 return false;
             }
 
-            // 2) Captions available -------------------------------------------------------
-            if (_requireCaptions && !string.Equals(vid.ContentDetails.Caption, "true", StringComparison.OrdinalIgnoreCase))
+            var v = resp.Items[0];
+
+            // 3) Parse ISO 8601 duration string, e.g. "PT3M45S"
+            TimeSpan duration;
+            try
             {
-                _logger.LogInformation("Rejected video {Id} – no captions", id);
+                duration = XmlConvert.ToTimeSpan(v.ContentDetails.Duration);
+            }
+            catch (FormatException ex)
+            {
+                _log.LogError(ex, "Video '{Id}' rejected – failed to parse duration '{RawDuration}'",
+                              id, v.ContentDetails.Duration);
                 return false;
             }
 
-            // 3) Fuzzy relevance ----------------------------------------------------------
-            var text = new StringBuilder()
-                .Append(vid.Snippet.Title).Append(' ').Append(vid.Snippet.Description)
-                .ToString();
-            int score = Fuzz.TokenSetRatio(lessonTopic, text);
+            // 4) Check duration window
+            if (duration < _minDur || duration > _maxDur)
+            {
+                _log.LogInformation(
+                    "Video '{Id}' rejected – duration {Dur} outside allowed range ({Min} - {Max})",
+                    id, duration, _minDur, _maxDur
+                );
+                return false;
+            }
+
+            // 5) If captions are required, ensure they exist
+            if (_needCaptions &&
+                !string.Equals(v.ContentDetails.Caption, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                _log.LogInformation("Video '{Id}' rejected – captions missing", id);
+                return false;
+            }
+
+            // 6) Fuzzy-match title + description against lessonTopic
+            var snippetText = $"{v.Snippet.Title}\n{v.Snippet.Description}".Trim();
+            int score = Fuzz.TokenSetRatio(lessonTopic, snippetText);
+
+            _log.LogInformation(
+                "YT relevance score={Score} for lessonTopic='{Topic}'\nSnippet:\n{Snippet}",
+                score, lessonTopic, snippetText
+            );
+
             if (score < _fuzzThreshold)
             {
-                _logger.LogInformation("Rejected video {Id} – fuzzy score {Score} < {Threshold}", id, score, _fuzzThreshold);
+                _log.LogInformation("Video '{Id}' rejected – fuzzy score {Score} < {Threshold}",
+                                     id, score, _fuzzThreshold);
                 return false;
             }
 
-            _logger.LogDebug("Video {Id} accepted – score {Score}, duration {Dur}", id, score, dur);
+            _log.LogDebug("Video '{Id}' accepted – duration={Dur}, score={Score}", id, duration, score);
             return true;
         }
 
-        #region Helpers
-        private static string? ExtractVideoId(string input)
+        // ---- helper to extract a standard 11-character ID from various YouTube URL formats ----
+        private static string? ExtractId(string input)
         {
-            // Handles watch?v=, youtu.be/, embed/, or raw 11‑char ID
-            var match = System.Text.RegularExpressions.Regex.Match(input,
-                "(?:v=|youtu\\.be/|embed/|watch\\?v=)?(?<id>[A-Za-z0-9_-]{11})", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return match.Success ? match.Groups["id"].Value : null;
-        }
+            var m = System.Text.RegularExpressions.Regex.Match(
+                input,
+                @"(?:v=|youtu\.be/|embed/|watch\?v=)?(?<id>[A-Za-z0-9_-]{11})",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            );
 
-        private static bool TryParseIsoDuration(string iso, out TimeSpan timeSpan)
-        {
-            try
-            {
-                timeSpan = XmlConvert.ToTimeSpan(iso);
-                return true;
-            }
-            catch
-            {
-                timeSpan = default;
-                return false;
-            }
+            return m.Success ? m.Groups["id"].Value : null;
         }
-        #endregion
     }
 }
